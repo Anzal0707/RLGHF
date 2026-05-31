@@ -1,0 +1,22 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Django
+db.sqlite3
+staticfiles/
+logs/
+
+# IDE
+.vscode/
+
+# Misc local
+modal_extracted.txt
