@@ -66,17 +66,32 @@ class ComplaintAdminSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'ticket_id', 'created_at', 'updated_at']
 
     def validate(self, data):
+        content_fields = {
+            'description',
+            'voice_file',
+            'is_anonymous',
+            'complainant_name',
+            'complainant_phone',
+        }
+        if self.partial and not (content_fields & data.keys()):
+            return data
+
         description = (data.get('description') or '').strip()
+        if not description and self.instance and 'description' not in data:
+            description = (self.instance.description or '').strip()
+
         voice_file = data.get('voice_file')
         if voice_file is None and hasattr(self, 'initial_data'):
             voice_file = self.initial_data.get('voice_file')
+        if voice_file is None and self.instance and 'voice_file' not in data:
+            voice_file = self.instance.voice_file
 
         if not description and not voice_file:
             raise serializers.ValidationError(
                 'Please provide a written description or upload a voice recording.'
             )
 
-        is_anonymous = data.get('is_anonymous', True)
+        is_anonymous = data.get('is_anonymous', self.instance.is_anonymous if self.instance else True)
         if not is_anonymous:
             name = (data.get('complainant_name') or '').strip()
             phone = (data.get('complainant_phone') or '').strip()

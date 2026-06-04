@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, MessageSquare } from "lucide-react";
+import ModalShell from "./ModalShell";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -34,12 +35,20 @@ interface HospitalRatingModalProps {
   isDark: boolean;
   /** Active language, controlled by the header language switcher. */
   lang: LangKey;
-  /** Called to send the rating DIRECTLY to admin (no complaint). */
-  onSubmit: (data: HospitalRatingPayload) => void;
+  /** Pushes the modal panel below the header/menu area. */
+  topOffsetPx?: number;
+  /** Called to send the rating DIRECTLY to admin (no complaint). May be async. */
+  onSubmit: (data: HospitalRatingPayload) => void | Promise<void>;
   /** Called when the user chooses to file a complaint (negative ratings). */
   onHaveComplaint: (data: HospitalRatingPayload) => void;
   /** Called when the user dismisses via the top-right X button. */
   onClose: () => void;
+  /** Override default hospital-wide title (e.g. department rating question). */
+  title?: string;
+  /** Override default subtitle. */
+  subtitle?: string;
+  /** Optional content below subtitle (e.g. department name chip). */
+  headerExtra?: ReactNode;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,10 +190,23 @@ function playPop() {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComplaint, onClose }: HospitalRatingModalProps) {
+export default function HospitalRatingModal({
+  isDark,
+  lang,
+  topOffsetPx,
+  onSubmit,
+  onHaveComplaint,
+  onClose,
+  title,
+  subtitle,
+  headerExtra,
+}: HospitalRatingModalProps) {
   const [selected, setSelected] = useState<EmojiOption | null>(null);
   const [text, setText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const tr = TR[lang] ?? TR.en;
+  const displayTitle = title ?? tr.title;
+  const displaySubtitle = subtitle ?? tr.subtitle;
 
   // Text is OPTIONAL — a rating can be submitted with just an emoji selected.
   // (Complaint/feedback text is never required to send a rating.)
@@ -208,9 +230,15 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
   };
 
   // Send the rating DIRECTLY to admin (positive ratings, or "just send my rating").
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const payload = buildPayload();
-    if (payload) onSubmit(payload);
+    if (!payload || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSubmit(payload));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // User wants to file a complaint → reaction is saved in state by the parent
@@ -222,26 +250,20 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
 
   // ── Theme tokens ──────────────────────────────────────────────────────────
   const panel = isDark
-    ? "bg-slate-900 border-slate-800 shadow-2xl shadow-black/50"
+    ? "bg-slate-900 border-slate-600 shadow-2xl shadow-black/50"
     : "bg-white border-slate-200 shadow-2xl shadow-slate-400/20";
   const heading = isDark ? "text-white" : "text-slate-900";
-  const sub = isDark ? "text-slate-400" : "text-slate-500";
+  const sub = isDark ? "text-slate-300" : "text-slate-500";
   const inputCls = isDark
-    ? "bg-slate-950/60 border-slate-700 text-slate-100 placeholder:text-slate-600 focus:border-teal-500"
+    ? "bg-slate-800/80 border-slate-600 text-slate-50 placeholder:text-slate-400 focus:border-teal-400"
     : "bg-[#fbfdfd] border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-teal-600";
 
   return (
-    // Popup centered vertically and horizontally in the available viewport.
-    // Header (z-[110]) stays visible at the top; popup (z-[60]) sits below it.
-    // overflow-y-auto on the panel itself lets tall content scroll inside.
-    <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none pt-[72px] sm:pt-[76px] px-3 sm:px-5 pb-4">
-      {/* Backdrop — top-[72px] keeps header clickable above */}
-      <div
-        className={`fixed left-0 right-0 bottom-0 top-[72px] sm:top-[76px] pointer-events-auto ${isDark ? "bg-slate-950/85" : "bg-slate-900/40"} backdrop-blur-sm`}
-        aria-hidden="true"
-      />
-
-      {/* Panel centered in available space */}
+    <ModalShell
+      onBackdropClick={onClose}
+      panelClassName="max-w-3xl lg:max-w-4xl w-full"
+      topOffsetPx={topOffsetPx}
+    >
       <motion.div
         role="dialog"
         aria-modal="true"
@@ -249,7 +271,7 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
-        className={`relative z-10 w-full max-w-3xl lg:max-w-4xl rounded-3xl border py-4 px-6 sm:py-6 sm:px-8 lg:py-5 lg:px-14 xl:py-3 xl:px-12 flex flex-col pointer-events-auto max-h-[calc(100vh-100px)] xl:max-h-[min(calc(100vh-120px),680px)] overflow-y-auto ${panel}`}
+        className={`relative w-full max-h-[min(calc(100dvh-12rem),720px)] rounded-3xl border py-4 px-6 sm:py-6 sm:px-8 lg:py-5 lg:px-14 xl:py-3 xl:px-12 flex flex-col overflow-y-auto overflow-x-hidden ${panel}`}
       >
           {/* X close button */}
           <button
@@ -257,7 +279,7 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
             onClick={onClose}
             aria-label={tr.closeAria}
             className={`absolute top-3 right-3 p-1.5 rounded-lg transition-colors cursor-pointer z-10 ${
-              isDark ? "text-slate-500 hover:text-white hover:bg-slate-800" : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+              isDark ? "text-slate-400 hover:text-white hover:bg-slate-800" : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -287,13 +309,16 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
                     : "text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-emerald-600"
                 }`}
               >
-                {tr.title}
+                {displayTitle}
               </h2>
               <p className={`text-base sm:text-lg mt-3 xl:mt-2 xl:text-base leading-relaxed font-medium ${
                 isDark ? "text-slate-300" : "text-slate-600"
               }`}>
-                {tr.subtitle}
+                {displaySubtitle}
               </p>
+              {headerExtra && (
+                <div className="mt-3 flex justify-center">{headerExtra}</div>
+              )}
             </motion.div>
           </div>
 
@@ -334,8 +359,8 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
                           ? isDark
                             ? "bg-teal-500/15 border-teal-400 shadow-md shadow-teal-500/20"
                             : "bg-teal-50 border-teal-500 shadow-md shadow-teal-500/15"
-                          : isDark
-                            ? "border-slate-600 hover:border-teal-500/70 hover:bg-slate-800/40"
+                          :                           isDark
+                            ? "bg-slate-800/70 border-slate-600 hover:border-teal-400/80 hover:bg-slate-800"
                             : "border-slate-300 hover:border-teal-500 hover:bg-teal-50/50"
                       }`}
                     >
@@ -381,8 +406,9 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
                       </button>
                       <button
                         type="button"
-                        onClick={handleSubmit}
-                        className={`flex-1 px-3 py-3.5 rounded-xl font-bold transition-all cursor-pointer flex items-center justify-center gap-2 text-sm sm:text-base active:scale-[0.98] ${
+                        onClick={() => void handleSubmit()}
+                        disabled={isSubmitting}
+                        className={`flex-1 px-3 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm sm:text-base active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${
                           isDark
                             ? "bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 shadow-lg shadow-teal-500/10"
                             : "bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/10"
@@ -402,7 +428,7 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
                     }`}>
                       {tr.prompts[selected.value]}
                     </div>
-                    <label htmlFor="hospital-rating-text" className={`block text-xs sm:text-sm font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <label htmlFor="hospital-rating-text" className={`block text-xs sm:text-sm font-semibold ${isDark ? "text-slate-300" : "text-slate-500"}`}>
                       {tr.helper}
                     </label>
                     <div className="flex flex-row items-start gap-3">
@@ -419,23 +445,24 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
                         rows={2}
                         className={`flex-1 px-4 py-3 rounded-xl border-2 resize-none text-sm sm:text-base transition-colors focus:outline-none ${
                           isDark
-                            ? "bg-slate-800/50 border-teal-500/50 text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                            ? "bg-slate-800/70 border-teal-500/60 text-slate-100 placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/25"
                             : "bg-white border-emerald-500/50 text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                         }`}
                         autoFocus
                       />
                       <button
                         type="button"
-                        onClick={handleSubmit}
-                        disabled={!canSubmit}
+                        onClick={() => void handleSubmit()}
+                        disabled={!canSubmit || isSubmitting}
                         aria-label="Submit rating"
+                        aria-busy={isSubmitting}
                         className={`shrink-0 h-12 px-4 sm:px-5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs sm:text-sm whitespace-nowrap ${
-                          canSubmit
+                          canSubmit && !isSubmitting
                             ? isDark
                               ? "bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 shadow-lg shadow-teal-500/10 active:scale-[0.98] cursor-pointer"
                               : "bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/10 active:scale-[0.98] cursor-pointer"
                             : isDark
-                              ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                              ? "bg-slate-700 text-slate-400 cursor-not-allowed"
                               : "bg-slate-200 text-slate-400 cursor-not-allowed"
                         }`}
                       >
@@ -455,6 +482,6 @@ export default function HospitalRatingModal({ isDark, lang, onSubmit, onHaveComp
             )}
           </AnimatePresence>
         </motion.div>
-    </div>
+    </ModalShell>
   );
 }

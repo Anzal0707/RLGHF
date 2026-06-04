@@ -1,9 +1,11 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from .serializers import ProfileSelfUpdateSerializer, build_auth_user_payload
 
 
 @api_view(['POST'])
@@ -28,13 +30,7 @@ def admin_login(request):
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser,
-            }
+            'user': build_auth_user_payload(user),
         })
     else:
         return Response(
@@ -52,16 +48,35 @@ def admin_check_auth(request):
     if request.user.is_authenticated and request.user.is_staff:
         return Response({
             'authenticated': True,
-            'user': {
-                'id': request.user.id,
-                'username': request.user.username,
-                'email': request.user.email,
-                'is_staff': request.user.is_staff,
-                'is_superuser': request.user.is_superuser,
-            }
+            'user': build_auth_user_payload(request.user),
         })
     else:
         return Response(
             {'authenticated': False},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def admin_me(request):
+    """Current user profile with Django groups and permissions."""
+    if not request.user.is_staff:
+        return Response(
+            {'detail': 'Staff access required.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    user = request.user
+    if request.method == 'GET':
+        return Response({'user': build_auth_user_payload(user)})
+    serializer = ProfileSelfUpdateSerializer(
+        user,
+        data=request.data,
+        partial=True,
+        context={'request': request},
+    )
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    serializer.save()
+    user.refresh_from_db()
+    return Response({'user': build_auth_user_payload(user)})

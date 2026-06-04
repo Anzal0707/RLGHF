@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -33,20 +33,24 @@ import {
   Moon,
   Activity,
   Lock,
+  Trash2,
+  UserCircle,
 } from "lucide-react";
 import { apiClient, ApiError } from "../lib/apiClient";
+import {
+  type AuthUser,
+  type AdminViewId,
+  canAccessView,
+  firstAllowedView,
+  hasPerm,
+  PERMS,
+} from "../lib/adminPermissions";
+import UserManagement from "./UserManagement";
+import UserProfile from "./UserProfile";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface AuthUser {
-  id: number;
-  username: string;
-  email: string;
-  is_staff: boolean;
-  is_superuser: boolean;
-}
 
 interface Complaint {
   id: number;
@@ -140,6 +144,9 @@ const PRIORITY_CFG_LIGHT: Record<string, { pill: string; text: string }> = {
 const STATUS_OPTIONS = ["NEW", "REVIEW", "ASSIGNED", "ACTION", "CLOSED", "ESCALATED"];
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "EMERGENCY"];
 const PAGE_SIZE = 20;
+const DASHBOARD_REFRESH_MS = 30_000;
+/** Bypass browser HTTP cache for live admin data. */
+const ADMIN_GET_OPTS = { cache: "no-store" as RequestCache };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Small UI components
@@ -249,7 +256,7 @@ interface StatCardProps {
 }
 
 function StatCard({ title, value, sub, icon, accent, isDark, delay = 0 }: StatCardProps) {
-  const card = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
+  const card = isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200";
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -263,7 +270,7 @@ function StatCard({ title, value, sub, icon, accent, isDark, delay = 0 }: StatCa
       </div>
       <div>
         <div className={`text-3xl font-bold tabular-nums ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
-        {sub && <div className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{sub}</div>}
+        {sub && <div className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-400"}`}>{sub}</div>}
       </div>
     </motion.div>
   );
@@ -273,23 +280,140 @@ function StatCard({ title, value, sub, icon, accent, isDark, delay = 0 }: StatCa
 // Complaint Detail Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ComplaintModal({
-  complaint,
+type DeleteTarget =
+  | { kind: "complaint"; item: Complaint }
+  | { kind: "rating"; item: Rating };
+
+function DeleteConfirmDialog({
+  target,
   isDark,
-  onClose,
-  onStatusChange,
-  updating,
+  deleting,
+  onCancel,
+  onConfirm,
 }: {
-  complaint: Complaint;
+  target: DeleteTarget;
   isDark: boolean;
-  onClose: () => void;
-  onStatusChange: (id: number, status: string) => void;
-  updating: boolean;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
 }) {
   const cardBg = isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200";
-  const label = isDark ? "text-slate-400 text-xs uppercase tracking-wide" : "text-slate-500 text-xs uppercase tracking-wide";
-  const val = isDark ? "text-white text-sm mt-0.5" : "text-slate-900 text-sm mt-0.5";
-  const divider = isDark ? "border-slate-800" : "border-slate-100";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-500";
+  const divider = isDark ? "border-slate-700" : "border-slate-200";
+  const title = target.kind === "complaint" ? "Delete complaint?" : "Delete rating?";
+  const detail =
+    target.kind === "complaint"
+      ? `Permanently remove complaint ${target.item.ticket_id}. This cannot be undone.`
+      : `Permanently remove rating #${target.item.id}${target.item.department ? ` (${target.item.department})` : ""}. This cannot be undone.`;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-record-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/55 backdrop-blur-2xl"
+        onClick={() => !deleting && onCancel()}
+        aria-hidden="true"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        className={`relative w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${cardBg}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`px-5 py-4 border-b ${divider} flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? "bg-red-500/10" : "bg-red-50"}`}>
+              <Trash2 size={18} className={isDark ? "text-red-400" : "text-red-600"} />
+            </div>
+            <div>
+              <div id="delete-record-title" className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                {title}
+              </div>
+              <div className={`text-xs ${textMuted}`}>{detail}</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onCancel}
+            className={`p-2 rounded-lg ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4 flex flex-col sm:flex-row gap-3 justify-end">
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onCancel}
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold border ${
+              isDark
+                ? "bg-slate-800/60 border-slate-700 text-slate-200 hover:bg-slate-800"
+                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onConfirm}
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${
+              isDark
+                ? "bg-red-600 hover:bg-red-500 text-white"
+                : "bg-red-600 hover:bg-red-700 text-white"
+            } disabled:opacity-50`}
+          >
+            {deleting ? "Deleting…" : "Yes, delete"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ComplaintModal({
+  complaint,
+  draftStatus,
+  isDark,
+  onClose,
+  onDraftStatusChange,
+  onSaveStatus,
+  updating,
+  statusError,
+  statusSuccess,
+  canChangeStatus,
+  canDelete,
+  onDelete,
+  deleting,
+}: {
+  complaint: Complaint;
+  draftStatus: string;
+  isDark: boolean;
+  onClose: () => void;
+  onDraftStatusChange: (status: string) => void;
+  onSaveStatus: () => void;
+  updating: boolean;
+  statusError: string | null;
+  statusSuccess: boolean;
+  canChangeStatus: boolean;
+  canDelete: boolean;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  const hasUnsavedStatus = draftStatus !== complaint.status;
+  const cardBg = isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200";
+  const label = isDark ? "text-slate-300 text-xs uppercase tracking-wide" : "text-slate-500 text-xs uppercase tracking-wide";
+  const val = isDark ? "text-slate-50 text-sm mt-0.5" : "text-slate-900 text-sm mt-0.5";
+  const divider = isDark ? "border-slate-700" : "border-slate-100";
 
   return (
     <AnimatePresence>
@@ -315,13 +439,30 @@ function ComplaintModal({
               <div className={`font-mono text-sm font-semibold ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                 {complaint.ticket_id}
               </div>
-              <div className={`text-xs mt-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              <div className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-400"}`}>
                 {new Date(complaint.created_at).toLocaleString()}
               </div>
             </div>
-            <button onClick={onClose} className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}>
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {canDelete && (
+                <button
+                  type="button"
+                  title="Delete complaint"
+                  disabled={deleting || updating}
+                  onClick={onDelete}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isDark
+                      ? "hover:bg-red-500/10 text-slate-400 hover:text-red-400"
+                      : "hover:bg-red-50 text-slate-500 hover:text-red-600"
+                  } disabled:opacity-50`}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+              <button onClick={onClose} className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}>
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 space-y-5">
@@ -337,31 +478,90 @@ function ComplaintModal({
             </div>
 
             {/* Update Status */}
+            {canChangeStatus ? (
             <div>
-              <div className={label}>Update Status</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className={label}>Update Status</div>
+                {hasUnsavedStatus && (
+                  <span
+                    className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                      isDark
+                        ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}
+                  >
+                    Unsaved changes
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mt-2">
                 {STATUS_OPTIONS.map((s) => {
                   const cfg = STATUS_CFG[s];
-                  const active = complaint.status === s;
+                  const selected = draftStatus === s;
+                  const isSaved = complaint.status === s;
                   return (
                     <button
                       key={s}
-                      disabled={updating || active}
-                      onClick={() => onStatusChange(complaint.id, s)}
+                      type="button"
+                      disabled={updating}
+                      onClick={() => onDraftStatusChange(s)}
                       className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                        active
-                          ? `${cfg.pill} ${cfg.text} cursor-default`
+                        selected
+                          ? `${cfg.pill} ${cfg.text} ring-2 ring-offset-1 ${
+                              isDark ? "ring-teal-400/60 ring-offset-slate-900" : "ring-teal-500/50 ring-offset-white"
+                            }`
                           : isDark
                             ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
                             : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                       }`}
                     >
-                      {active && updating ? "Saving…" : cfg.label}
+                      {cfg.label}
+                      {selected && !isSaved && (
+                        <span className="sr-only"> (unsaved)</span>
+                      )}
                     </button>
                   );
                 })}
               </div>
+              <button
+                type="button"
+                disabled={updating || !hasUnsavedStatus}
+                onClick={onSaveStatus}
+                className={`mt-3 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDark
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 shadow-md shadow-teal-500/20"
+                    : "bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/15"
+                }`}
+              >
+                {updating ? "Saving…" : "Save Status"}
+              </button>
+              {statusError && (
+                <p className={`mt-2 text-xs ${isDark ? "text-red-400" : "text-red-600"}`}>{statusError}</p>
+              )}
+              <AnimatePresence>
+                {statusSuccess && !statusError && (
+                  <motion.p
+                    role="alert"
+                    aria-live="polite"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.2 }}
+                    className={`mt-2 text-xs font-semibold flex items-center gap-1.5 ${
+                      isDark ? "text-emerald-400" : "text-emerald-600"
+                    }`}
+                  >
+                    <CheckCircle size={14} className="shrink-0" aria-hidden />
+                    Status saved.
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
+            ) : (
+              <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                You do not have permission to change complaint status.
+              </p>
+            )}
 
             <div className={`border-t ${divider}`} />
 
@@ -494,10 +694,10 @@ function LoginScreen({
   const [p, setP] = useState("");
   const bg = isDark ? "bg-slate-950" : "bg-[#f4f7f6]";
   const card = isDark
-    ? "bg-slate-900/80 border-slate-800 shadow-2xl shadow-slate-950/60"
+    ? "bg-slate-900/90 border-slate-700 shadow-2xl shadow-black/50"
     : "bg-white border-slate-200/80 shadow-xl shadow-teal-900/5";
   const inp = isDark
-    ? "bg-slate-950/60 border-slate-800 text-white placeholder-slate-600 focus:border-teal-500"
+    ? "bg-slate-900/70 border-slate-600 text-slate-50 placeholder:text-slate-400 focus:border-teal-400"
     : "bg-[#fbfdfd] border-slate-200 text-slate-800 placeholder-slate-400 focus:border-teal-600";
   const lbl = isDark ? "text-slate-300 text-sm font-medium" : "text-slate-700 text-sm font-medium";
 
@@ -543,7 +743,7 @@ function LoginScreen({
             <h1 className={`text-base font-extrabold leading-snug ${isDark ? "bg-gradient-to-r from-teal-400 to-emerald-300 bg-clip-text text-transparent" : "bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent"}`}>
               Ramlal Golchha Eye Hospital Foundation
             </h1>
-            <p className={`text-[10px] mt-1 leading-snug ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+            <p className={`text-[10px] mt-1 leading-snug ${isDark ? "text-slate-400" : "text-slate-400"}`}>
               Under the Management of Nepal Eye Program,<br />Tilganga Institute of Ophthalmology
             </p>
           </div>
@@ -559,7 +759,7 @@ function LoginScreen({
           <div>
             <label className={lbl}>Username</label>
             <div className="relative mt-1">
-              <User size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+              <User size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-400" : "text-slate-400"}`} />
               <input
                 type="text"
                 value={u}
@@ -573,7 +773,7 @@ function LoginScreen({
           <div>
             <label className={lbl}>Password</label>
             <div className="relative mt-1">
-              <Lock size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+              <Lock size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-400" : "text-slate-400"}`} />
               <input
                 type="password"
                 value={p}
@@ -630,18 +830,13 @@ function LoginScreen({
 // Sidebar
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ViewId =
-  | "overview"
-  | "complaints"
-  | "individual"
-  | "dept-ratings"
-  | "hospital-ratings";
+type ViewId = AdminViewId;
 
 type NavLeaf = { id: ViewId; label: string; icon: typeof LayoutDashboard };
 type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; children: NavLeaf[] };
 type NavEntry = NavLeaf | NavGroup;
 
-const NAV_ITEMS: NavEntry[] = [
+const BASE_NAV_ITEMS: NavEntry[] = [
   { id: "overview",   label: "Overview",         icon: LayoutDashboard },
   { id: "complaints", label: "Dept. Complaints", icon: MessageSquare },
   { id: "individual", label: "Staff Complaints", icon: Users },
@@ -650,11 +845,71 @@ const NAV_ITEMS: NavEntry[] = [
     label: "Ratings",
     icon: Star,
     children: [
-      { id: "dept-ratings",     label: "Department Ratings", icon: Building },
       { id: "hospital-ratings", label: "Hospital Ratings",   icon: Activity },
+      { id: "dept-ratings",     label: "Department Ratings", icon: Building },
     ],
   },
 ];
+
+function buildNavItems(user: AuthUser | null): NavEntry[] {
+  const items: NavEntry[] = [];
+  for (const entry of BASE_NAV_ITEMS) {
+    if ("children" in entry) {
+      const children = entry.children.filter((child) => canAccessView(user, child.id));
+      if (children.length > 0) {
+        items.push({ ...entry, children });
+      }
+    } else if (canAccessView(user, entry.id)) {
+      items.push(entry);
+    }
+  }
+  return items;
+}
+
+function buildFoundationNavItems(user: AuthUser | null): NavLeaf[] {
+  const items: NavLeaf[] = [];
+  if (canAccessView(user, "profile")) {
+    items.push({ id: "profile", label: "My Profile", icon: UserCircle });
+  }
+  if (canAccessView(user, "users")) {
+    items.push({ id: "users", label: "User Management", icon: Shield });
+  }
+  return items;
+}
+
+function renderNavLeafButton(
+  child: NavLeaf,
+  active: ViewId,
+  collapsed: boolean,
+  isDark: boolean,
+  onNav: (v: ViewId) => void,
+  compact?: boolean,
+) {
+  const ChildIcon = child.icon;
+  const childActive = active === child.id;
+  return (
+    <button
+      key={child.id}
+      type="button"
+      onClick={() => onNav(child.id)}
+      title={collapsed ? child.label : undefined}
+      className={`w-full flex items-center gap-2.5 rounded-lg font-medium transition-all duration-150 ${
+        compact ? "px-2 py-2 text-[12px]" : "px-2.5 py-2 text-[13px]"
+      } ${
+        childActive
+          ? isDark
+            ? "bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 shadow-md shadow-teal-500/20"
+            : "bg-teal-600 text-white shadow-md shadow-teal-600/15"
+          : isDark
+            ? "text-slate-400 hover:text-white hover:bg-slate-800"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+      }`}
+    >
+      <ChildIcon size={compact ? 14 : 15} className="shrink-0" />
+      {!collapsed && <span className="truncate text-left">{child.label}</span>}
+    </button>
+  );
+}
 
 function Sidebar({
   active,
@@ -665,6 +920,10 @@ function Sidebar({
   collapsed,
   ratingsOpen,
   onToggleRatings,
+  foundationNavOpen,
+  onToggleFoundationNav,
+  navItems,
+  foundationNavItems,
 }: {
   active: ViewId;
   onNav: (v: ViewId) => void;
@@ -674,16 +933,24 @@ function Sidebar({
   collapsed: boolean;
   ratingsOpen: boolean;
   onToggleRatings: () => void;
+  foundationNavOpen: boolean;
+  onToggleFoundationNav: () => void;
+  navItems: NavEntry[];
+  foundationNavItems: NavLeaf[];
 }) {
-  const sidebarBg = isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200";
-  const textMuted = isDark ? "text-slate-500" : "text-slate-400";
+  const sidebarBg = isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-200";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-400";
+  const foundationActive = foundationNavItems.some((c) => c.id === active);
+  const hasFoundationChildren = foundationNavItems.length > 0;
+  const roleLabel = user?.is_superuser ? "Superuser" : "Staff";
+  const foundationToggleTitle = "Ramlal Golchha Eye Hospital Foundation @RLG";
 
   return (
     <aside
-      className={`flex flex-col border-r transition-all duration-300 ${sidebarBg} ${collapsed ? "w-[60px]" : "w-60"} shrink-0 h-screen sticky top-0 overflow-hidden`}
+      className={`flex flex-col border-r transition-all duration-300 ${sidebarBg} ${collapsed ? "w-[60px]" : "w-60"} shrink-0 h-dvh min-h-dvh min-h-0 overflow-hidden`}
     >
       {/* Hospital Logo */}
-      <div className={`flex items-center gap-3 px-3 py-4 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+      <div className={`shrink-0 flex items-center gap-3 px-3 py-4 border-b ${isDark ? "border-slate-700" : "border-slate-100"}`}>
         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-400 flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20">
           <svg className="w-5 h-5 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -701,17 +968,18 @@ function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((entry) => {
+      <nav className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto">
+        {navItems.map((entry) => {
           // ── Grouped (dropdown) entry, e.g. Ratings ──────────────────────────
           if ("children" in entry) {
             const Icon = entry.icon;
             const groupActive = entry.children.some((c) => c.id === active);
-            const open = ratingsOpen || groupActive;
             return (
               <div key={entry.id}>
                 <button
+                  type="button"
                   onClick={onToggleRatings}
+                  aria-expanded={ratingsOpen}
                   title={collapsed ? entry.label : undefined}
                   className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                     groupActive
@@ -729,7 +997,7 @@ function Sidebar({
                       <span className="truncate flex-1 text-left">{entry.label}</span>
                       <ChevronDown
                         size={15}
-                        className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                        className={`shrink-0 transition-transform duration-200 ${ratingsOpen ? "rotate-180" : ""}`}
                       />
                     </>
                   )}
@@ -738,36 +1006,18 @@ function Sidebar({
                 {/* Children */}
                 {!collapsed && (
                   <AnimatePresence initial={false}>
-                    {open && (
+                    {ratingsOpen && (
                       <motion.div
+                        key="ratings-nav-children"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.18 }}
-                        className="overflow-hidden mt-0.5 ml-3.5 pl-2.5 space-y-0.5 border-l border-dashed border-slate-300 dark:border-slate-700"
+                        className={`overflow-hidden mt-0.5 ml-3.5 pl-2.5 space-y-0.5 border-l border-dashed ${isDark ? "border-slate-600" : "border-slate-300"}`}
                       >
-                        {entry.children.map((child) => {
-                          const ChildIcon = child.icon;
-                          const childActive = active === child.id;
-                          return (
-                            <button
-                              key={child.id}
-                              onClick={() => onNav(child.id)}
-                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
-                                childActive
-                                  ? isDark
-                                    ? "bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 shadow-md shadow-teal-500/20"
-                                    : "bg-teal-600 text-white shadow-md shadow-teal-600/15"
-                                  : isDark
-                                    ? "text-slate-400 hover:text-white hover:bg-slate-800"
-                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                              }`}
-                            >
-                              <ChildIcon size={15} className="shrink-0" />
-                              <span className="truncate">{child.label}</span>
-                            </button>
-                          );
-                        })}
+                        {entry.children.map((child) =>
+                          renderNavLeafButton(child, active, collapsed, isDark, onNav),
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -801,21 +1051,84 @@ function Sidebar({
         })}
       </nav>
 
-      {/* User / Logout */}
-      <div className={`p-2 border-t ${isDark ? "border-slate-800" : "border-slate-100"} space-y-1`}>
-        {!collapsed && user && (
-          <div className={`px-2.5 py-2 rounded-xl ${isDark ? "bg-slate-800/60" : "bg-slate-50"}`}>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <div className={`text-xs font-semibold truncate ${isDark ? "text-white" : "text-slate-800"}`}>
-                {user.username}
+      {/* Account nav — children above foundation / role parent toggle */}
+      {user && (
+        <div
+          className={`shrink-0 px-2 pt-2 border-t ${isDark ? "border-slate-700" : "border-slate-100"}`}
+        >
+          <div className="flex flex-col">
+            <AnimatePresence initial={false}>
+              {hasFoundationChildren && foundationNavOpen && (
+                <motion.div
+                  key="foundation-nav-children"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className={`overflow-hidden mb-1 pb-1 space-y-0.5 border-b border-dashed ${isDark ? "border-slate-600" : "border-slate-300"}`}
+                >
+                  {foundationNavItems.map((child) =>
+                    renderNavLeafButton(child, active, collapsed, isDark, onNav, true),
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="button"
+              onClick={hasFoundationChildren ? onToggleFoundationNav : undefined}
+              aria-expanded={hasFoundationChildren ? foundationNavOpen : undefined}
+              title={collapsed ? foundationToggleTitle : undefined}
+              className={`w-full text-left px-2.5 py-2.5 rounded-xl border transition-all duration-150 ${
+                foundationActive
+                  ? isDark
+                    ? "bg-slate-800/90 border-teal-500/40 text-teal-100"
+                    : "bg-teal-50 border-teal-200 text-teal-900"
+                  : isDark
+                    ? "bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-800"
+                    : "bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100"
+              } ${!hasFoundationChildren ? "cursor-default" : "cursor-pointer"}`}
+            >
+              <div className="flex items-start gap-2">
+                <div className="relative shrink-0 mt-0.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-gradient-to-tr from-teal-500 to-emerald-400 text-slate-950`}>
+                    {user.username?.[0]?.toUpperCase() ?? "A"}
+                  </div>
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 ${
+                      isDark ? "border-slate-900" : "border-white"
+                    }`}
+                  />
+                </div>
+                {!collapsed && (
+                  <>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className={`text-[10px] font-semibold leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
+                        Ramlal Golchha Eye Hospital Foundation
+                      </div>
+                      <div className={`text-[10px] mt-0.5 ${isDark ? "text-teal-400/90" : "text-teal-600"}`}>
+                        @RLG
+                      </div>
+                      <div className={`text-[10px] font-medium mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        {roleLabel}
+                      </div>
+                    </div>
+                    {hasFoundationChildren && (
+                      <ChevronDown
+                        size={15}
+                        className={`shrink-0 mt-1 transition-transform duration-200 ${foundationNavOpen ? "rotate-180" : ""} ${textMuted}`}
+                      />
+                    )}
+                  </>
+                )}
               </div>
-            </div>
-            <div className={`text-[10px] truncate mt-0.5 ${textMuted}`}>
-              {user.is_superuser ? "Superuser" : "Staff"}
-            </div>
+            </button>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Logout */}
+      <div className={`shrink-0 p-2 border-t ${isDark ? "border-slate-700" : "border-slate-100"} space-y-1`}>
         <button
           onClick={onLogout}
           title={collapsed ? "Sign out" : undefined}
@@ -851,6 +1164,8 @@ export default function AdminDashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [ratingsOpen, setRatingsOpen] = useState(false);
+  const [foundationNavOpen, setFoundationNavOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -869,6 +1184,57 @@ export default function AdminDashboardPage() {
   // ── Complaint modal ───────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Complaint | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<string>("NEW");
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState(false);
+  const [deleteFeedback, setDeleteFeedback] = useState<{
+    type: "success" | "error" | "deleted";
+    message: string;
+  } | null>(null);
+
+  const refreshGenRef = useRef(0);
+  const dataLoadingCountRef = useRef(0);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
+  const syncQueuedRef = useRef(false);
+  const queryRef = useRef({
+    page,
+    activeView,
+    search,
+    statusFilter,
+    priorityFilter,
+  });
+  const filterKeyRef = useRef(
+    `${activeView}|${search}|${statusFilter}|${priorityFilter}`,
+  );
+
+  queryRef.current = { page, activeView, search, statusFilter, priorityFilter };
+
+  const sidebarNavItems = buildNavItems(currentUser);
+  const foundationNavItems = buildFoundationNavItems(currentUser);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!canAccessView(currentUser, activeView)) {
+      setActiveView(firstAllowedView(currentUser));
+    }
+  }, [currentUser, activeView]);
+
+  useEffect(() => {
+    setStatusUpdateError(null);
+    setStatusUpdateSuccess(false);
+    if (selected) {
+      setDraftStatus(selected.status);
+    }
+  }, [selected?.id]);
+
+  useEffect(() => {
+    if (!statusUpdateSuccess) return;
+    const timer = window.setTimeout(() => setStatusUpdateSuccess(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [statusUpdateSuccess]);
 
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -884,24 +1250,52 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // ── Auto-refresh every 30s ────────────────────────────────────────────────
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  }, [isDark]);
+
+  const syncDashboardRef = useRef<(silent?: boolean) => Promise<void>>(async () => {});
+
+  // ── Reload when view/filters/page change ─────────────────────────────────
   useEffect(() => {
     if (!authed) return;
-    const timer = setInterval(() => {
-      silentRefresh();
-    }, 30000);
-    return () => clearInterval(timer);
+    void syncDashboardRef.current(false);
   }, [authed, activeView, search, statusFilter, priorityFilter, page]);
 
-  // ── Reload when view/filters change ──────────────────────────────────────
-  useEffect(() => {
-    if (authed) loadAll();
-  }, [authed, activeView, search, statusFilter, priorityFilter, page]);
-
-  // ── Reset page when filters change ───────────────────────────────────────
+  // ── Reset page when filters change (before next fetch uses new page) ─────
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter, priorityFilter, activeView]);
+
+  // ── Auto-refresh while tab is visible ────────────────────────────────────
+  useEffect(() => {
+    if (!authed) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void syncDashboardRef.current(true);
+    }, DASHBOARD_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [authed]);
+
+  // ── Refresh when tab regains focus or network reconnects ─────────────────
+  useEffect(() => {
+    if (!authed) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void syncDashboardRef.current(true);
+      }
+    };
+    const onOnline = () => {
+      void syncDashboardRef.current(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [authed]);
 
   // ─── Auth helpers ─────────────────────────────────────────────────────────
   async function checkAuth() {
@@ -909,7 +1303,7 @@ export default function AdminDashboardPage() {
       const data = await apiClient.get<{ authenticated: boolean; user: AuthUser }>("auth/admin/check-auth");
       if (data.authenticated) {
         setAuthed(true);
-        setCurrentUser(data.user);
+        setCurrentUser(normalizeAuthUser(data.user));
       } else {
         doLogout();
       }
@@ -918,6 +1312,23 @@ export default function AdminDashboardPage() {
     } finally {
       setAuthLoading(false);
     }
+  }
+
+  async function refreshCurrentUser() {
+    try {
+      const data = await apiClient.get<{ user: AuthUser }>("auth/admin/me", { cache: "no-store" });
+      setCurrentUser(normalizeAuthUser(data.user));
+    } catch {
+      // Keep existing session user if profile refresh fails transiently.
+    }
+  }
+
+  function normalizeAuthUser(user: AuthUser): AuthUser {
+    return {
+      ...user,
+      groups: user.groups ?? [],
+      permissions: user.permissions ?? [],
+    };
   }
 
   async function handleLogin(username: string, password: string) {
@@ -930,7 +1341,7 @@ export default function AdminDashboardPage() {
       );
       localStorage.setItem("access_token", data.access);
       localStorage.setItem("refresh_token", data.refresh);
-      setCurrentUser(data.user);
+      setCurrentUser(normalizeAuthUser(data.user));
       setAuthed(true);
     } catch (err) {
       setLoginError(err instanceof ApiError ? err.message : "Login failed. Please try again.");
@@ -946,52 +1357,113 @@ export default function AdminDashboardPage() {
     setCurrentUser(null);
   }
 
-  // ─── Data helpers ──────────────────────────────────────────────────────────
-  async function loadAll() {
-    setDataLoading(true);
-    try {
-      await Promise.all([fetchStats(), fetchComplaints(), fetchRatings()]);
-      setLastRefreshed(new Date());
-    } finally {
-      setDataLoading(false);
-    }
+  function requestLogout() {
+    setLogoutConfirmOpen(true);
   }
 
-  async function silentRefresh() {
-    await Promise.all([fetchStats(), fetchComplaints(), fetchRatings()]);
-    setLastRefreshed(new Date());
+  // ─── Data helpers ──────────────────────────────────────────────────────────
+  async function runSyncBatch(gen: number, silent: boolean): Promise<boolean> {
+    await apiClient.ensureValidAccessToken();
+    const [statsOk, complaintsOk, ratingsOk] = await Promise.all([
+      fetchStatsForGen(gen),
+      fetchComplaintsForGen(gen, silent),
+      fetchRatingsForGen(gen, silent),
+    ]);
+    if (gen === refreshGenRef.current) {
+      setLastRefreshed(new Date());
+    }
+    if (authed) {
+      await refreshCurrentUser();
+    }
+    return statsOk && complaintsOk && ratingsOk;
   }
+
+  async function syncDashboard(silent = false) {
+    if (syncInFlightRef.current) {
+      syncQueuedRef.current = true;
+      return syncInFlightRef.current;
+    }
+
+    const execute = async () => {
+      do {
+        syncQueuedRef.current = false;
+        const gen = ++refreshGenRef.current;
+        if (!silent) {
+          dataLoadingCountRef.current += 1;
+          setDataLoading(true);
+        }
+        try {
+          let ok = await runSyncBatch(gen, silent);
+          if (!ok && gen === refreshGenRef.current) {
+            const token = await apiClient.ensureValidAccessToken();
+            if (token) {
+              ok = await runSyncBatch(gen, silent);
+            }
+          }
+        } finally {
+          if (!silent) {
+            dataLoadingCountRef.current = Math.max(0, dataLoadingCountRef.current - 1);
+          }
+          if (!silent && dataLoadingCountRef.current === 0) {
+            setDataLoading(false);
+          }
+        }
+      } while (syncQueuedRef.current);
+    };
+
+    syncInFlightRef.current = execute().finally(() => {
+      syncInFlightRef.current = null;
+    });
+    return syncInFlightRef.current;
+  }
+
+  syncDashboardRef.current = syncDashboard;
 
   async function manualRefresh() {
     setIsRefreshing(true);
-    await silentRefresh();
+    await syncDashboard(true);
     setIsRefreshing(false);
   }
 
-  async function fetchStats() {
-    try {
-      const d = await apiClient.get<DashboardStats>("analytics/stats");
-      setStats(d);
-    } catch {}
+  function complaintsPageForFetch() {
+    const q = queryRef.current;
+    const filterKey = `${q.activeView}|${q.search}|${q.statusFilter}|${q.priorityFilter}`;
+    if (filterKeyRef.current !== filterKey) {
+      filterKeyRef.current = filterKey;
+      return 1;
+    }
+    return q.page;
   }
 
-  async function fetchComplaints() {
+  async function fetchStatsForGen(gen: number): Promise<boolean> {
+    try {
+      const d = await apiClient.get<DashboardStats>("analytics/stats", ADMIN_GET_OPTS);
+      if (gen !== refreshGenRef.current) return true;
+      setStats(d);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function fetchComplaintsForGen(gen: number, silent: boolean): Promise<boolean> {
+    const q = queryRef.current;
     try {
       const params: Record<string, string | number | boolean> = {
-        page,
+        page: complaintsPageForFetch(),
         page_size: PAGE_SIZE,
       };
-      if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
-      if (priorityFilter) params.priority = priorityFilter;
-      if (activeView === "individual") params.is_individual_complaint = true;
-      else if (activeView === "complaints") params.is_individual_complaint = false;
+      if (q.search) params.search = q.search;
+      if (q.statusFilter) params.status = q.statusFilter;
+      if (q.priorityFilter) params.priority = q.priorityFilter;
+      if (q.activeView === "individual") params.is_individual_complaint = "true";
+      else if (q.activeView === "complaints") params.is_individual_complaint = "false";
 
       const d = await apiClient.get<PaginatedResponse<Complaint> | Complaint[]>(
         "complaints/admin/complaints",
-        { params }
+        { params, ...ADMIN_GET_OPTS },
       );
-      // Handle both paginated {count, results} and plain array responses
+      if (gen !== refreshGenRef.current) return true;
       if (Array.isArray(d)) {
         setComplaints(d);
         setComplaintsCount(d.length);
@@ -999,24 +1471,25 @@ export default function AdminDashboardPage() {
         setComplaints(d.results ?? []);
         setComplaintsCount(d.count ?? 0);
       }
+      return true;
     } catch {
-      setComplaints([]);
-      setComplaintsCount(0);
+      if (gen !== refreshGenRef.current) return true;
+      return false;
     }
   }
 
-  async function fetchRatings() {
+  async function fetchRatingsForGen(gen: number, silent: boolean): Promise<boolean> {
+    const q = queryRef.current;
     try {
       const params: Record<string, string | number | boolean> = { page: 1, page_size: 50 };
-      // Department Ratings → is_hospital_rating=false (covers all existing rows).
-      // Hospital Ratings   → is_hospital_rating=true.
-      if (activeView === "hospital-ratings") params.is_hospital_rating = true;
-      else if (activeView === "dept-ratings") params.is_hospital_rating = false;
+      if (q.activeView === "hospital-ratings") params.is_hospital_rating = "true";
+      else if (q.activeView === "dept-ratings") params.is_hospital_rating = "false";
 
       const d = await apiClient.get<PaginatedResponse<Rating> | Rating[]>(
         "complaints/admin/ratings",
-        { params }
+        { params, ...ADMIN_GET_OPTS },
       );
+      if (gen !== refreshGenRef.current) return true;
       if (Array.isArray(d)) {
         setRatings(d);
         setRatingsCount(d.length);
@@ -1024,21 +1497,89 @@ export default function AdminDashboardPage() {
         setRatings(d.results ?? []);
         setRatingsCount(d.count ?? 0);
       }
+      return true;
     } catch {
-      setRatings([]);
-      setRatingsCount(0);
+      if (gen !== refreshGenRef.current) return true;
+      return false;
     }
   }
 
-  async function handleStatusChange(id: number, newStatus: string) {
-    setUpdatingStatus(true);
+  const canDeleteComplaint = hasPerm(currentUser, PERMS.deleteComplaint);
+  const canDeleteRating = hasPerm(currentUser, PERMS.deleteRating);
+
+  useEffect(() => {
+    if (!deleteFeedback) return;
+    const t = window.setTimeout(() => setDeleteFeedback(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [deleteFeedback]);
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    if (deleteTarget.kind === "complaint" && !canDeleteComplaint) {
+      setDeleteFeedback({ type: "error", message: "You do not have permission to delete complaints." });
+      setDeleteTarget(null);
+      return;
+    }
+    if (deleteTarget.kind === "rating" && !canDeleteRating) {
+      setDeleteFeedback({ type: "error", message: "You do not have permission to delete ratings." });
+      setDeleteTarget(null);
+      return;
+    }
+
+    const target = deleteTarget;
+    setDeletingRecord(true);
+    setDeleteFeedback(null);
     try {
-      const updated = await apiClient.patch<Complaint>(`complaints/admin/complaints/${id}`, { status: newStatus });
-      setComplaints((prev) => prev.map((c) => (c.id === id ? updated : c)));
-      if (selected?.id === id) setSelected(updated);
-      await fetchStats();
+      if (target.kind === "complaint") {
+        await apiClient.delete(`complaints/admin/complaints/${target.item.id}`);
+        setComplaints((prev) => prev.filter((c) => c.id !== target.item.id));
+        setComplaintsCount((n) => Math.max(0, n - 1));
+        if (selected?.id === target.item.id) setSelected(null);
+        setDeleteFeedback({ type: "deleted", message: `Complaint ${target.item.ticket_id} deleted.` });
+      } else {
+        await apiClient.delete(`complaints/admin/ratings/${target.item.id}`);
+        setRatings((prev) => prev.filter((r) => r.id !== target.item.id));
+        setRatingsCount((n) => Math.max(0, n - 1));
+        setDeleteFeedback({ type: "deleted", message: `Rating #${target.item.id} deleted.` });
+      }
+      setDeleteTarget(null);
+      await syncDashboard(true);
     } catch (err) {
-      console.error("Status update failed", err);
+      setDeleteFeedback({
+        type: "error",
+        message: err instanceof ApiError ? err.message : "Failed to delete. Please try again.",
+      });
+    } finally {
+      setDeletingRecord(false);
+    }
+  }
+
+  async function handleSaveStatus() {
+    if (!selected || draftStatus === selected.status) return;
+    if (!hasPerm(currentUser, PERMS.changeComplaint)) {
+      setStatusUpdateError("You do not have permission to change complaint status.");
+      return;
+    }
+
+    const id = selected.id;
+    const newStatus = draftStatus;
+    setUpdatingStatus(true);
+    setStatusUpdateError(null);
+    setStatusUpdateSuccess(false);
+    try {
+      const updated = await apiClient.patch<Complaint>(
+        `complaints/admin/complaints/${id}`,
+        { status: newStatus },
+      );
+      setComplaints((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      setDraftStatus(updated.status);
+      setSelected(updated);
+      setStatusUpdateSuccess(true);
+      await syncDashboard(true);
+    } catch (err) {
+      setStatusUpdateError(
+        err instanceof ApiError ? err.message : "Failed to update status. Please try again.",
+      );
     } finally {
       setUpdatingStatus(false);
     }
@@ -1047,15 +1588,15 @@ export default function AdminDashboardPage() {
   // ─── Derived colors ────────────────────────────────────────────────────────
   const bg = isDark ? "bg-slate-950 text-white" : "bg-[#f4f7f6] text-slate-900";
   const cardBg = isDark
-    ? "bg-slate-900/80 border-slate-800"
+    ? "bg-slate-900/90 border-slate-700"
     : "bg-white border-slate-200/80";
   const textMuted = isDark ? "text-slate-400" : "text-slate-500";
   const inputCls = isDark
-    ? "bg-slate-950/60 border-slate-800 text-white placeholder-slate-600 focus:border-teal-500"
+    ? "bg-slate-900/70 border-slate-600 text-slate-50 placeholder:text-slate-400 focus:border-teal-400"
     : "bg-[#fbfdfd] border-slate-200 text-slate-800 placeholder-slate-400 focus:border-teal-600";
-  const divider = isDark ? "divide-slate-800 border-slate-800" : "divide-slate-100 border-slate-200";
-  const tableHover = isDark ? "hover:bg-slate-800/60 cursor-pointer" : "hover:bg-slate-50/80 cursor-pointer";
-  const tHead = isDark ? "bg-slate-800/50 text-slate-400" : "bg-slate-50 text-slate-500";
+  const divider = isDark ? "divide-slate-700 border-slate-700" : "divide-slate-100 border-slate-200";
+  const tableHover = isDark ? "hover:bg-slate-800/70 cursor-pointer" : "hover:bg-slate-50/80 cursor-pointer";
+  const tHead = isDark ? "bg-slate-800/80 text-slate-300" : "bg-slate-50 text-slate-500";
 
   // ─── Loading screen ────────────────────────────────────────────────────────
   if (authLoading) {
@@ -1439,7 +1980,7 @@ export default function AdminDashboardPage() {
                       <td className="px-4 py-3 whitespace-nowrap"><PriorityBadge priority={c.priority} isDark={isDark} /></td>
                       <td className={`px-4 py-3 text-xs ${textMuted} whitespace-nowrap`}>
                         {c.is_anonymous ? (
-                          <span className={`italic ${isDark ? "text-slate-600" : "text-slate-400"}`}>Anonymous</span>
+                          <span className={`italic ${isDark ? "text-slate-400" : "text-slate-400"}`}>Anonymous</span>
                         ) : (
                           c.complainant_name ?? c.complainant_phone ?? "—"
                         )}
@@ -1448,12 +1989,31 @@ export default function AdminDashboardPage() {
                         {new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setSelected(c); }}
-                          className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-slate-700 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
-                        >
-                          <Eye size={14} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelected(c); }}
+                            className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-slate-700 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
+                            title="View details"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          {canDeleteComplaint && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget({ kind: "complaint", item: c });
+                              }}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                isDark
+                                  ? "hover:bg-red-500/10 text-slate-400 hover:text-red-400"
+                                  : "hover:bg-red-50 text-slate-500 hover:text-red-600"
+                              }`}
+                              title="Delete complaint"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1516,8 +2076,8 @@ export default function AdminDashboardPage() {
     const avg = rows.length ? (rows.reduce((s, r) => s + r.rating, 0) / rows.length) : 0;
     const positive = rows.filter((r) => r.rating >= 4).length;
     const headers = isHospital
-      ? ["#", "Rating", "Feedback", "Language", "Date"]
-      : ["#", "Department", "Rating", "Feedback", "Language", "Date"];
+      ? ["#", "Rating", "Feedback", "Language", "Date", ""]
+      : ["#", "Department", "Rating", "Feedback", "Language", "Date", ""];
     const colCount = headers.length;
 
     return (
@@ -1585,11 +2145,38 @@ export default function AdminDashboardPage() {
                       )}
                       <td className="px-4 py-3"><StarRow rating={r.rating} /></td>
                       <td className={`px-4 py-3 text-xs max-w-xs truncate ${textMuted}`}>
-                        {r.feedback || <span className="italic opacity-50">No feedback</span>}
+                        {(() => {
+                          const fb = (r.feedback ?? "").trim();
+                          const isEmpty =
+                            !fb ||
+                            fb === "Direct rating submission" ||
+                            fb === "Overall hospital rating";
+                          return isEmpty ? (
+                            <span className="italic opacity-50">No feedback</span>
+                          ) : (
+                            fb
+                          );
+                        })()}
                       </td>
                       <td className={`px-4 py-3 text-xs uppercase ${textMuted}`}>{r.language}</td>
                       <td className={`px-4 py-3 text-xs ${textMuted} whitespace-nowrap`}>
                         {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canDeleteRating && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget({ kind: "rating", item: r })}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              isDark
+                                ? "hover:bg-red-500/10 text-slate-400 hover:text-red-400"
+                                : "hover:bg-red-50 text-slate-500 hover:text-red-600"
+                            }`}
+                            title="Delete rating"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1608,13 +2195,15 @@ export default function AdminDashboardPage() {
     individual: "Staff Complaints",
     "dept-ratings": "Department Ratings",
     "hospital-ratings": "Hospital Ratings",
+    users: "User Management",
+    profile: "My Profile",
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className={`flex min-h-screen ${bg} font-sans relative overflow-hidden`}>
+    <div className={`flex h-dvh min-h-dvh ${bg} font-sans relative overflow-hidden`}>
       {/* Ambient teal glow — matches main page */}
       {isDark ? (
         <>
@@ -1650,12 +2239,98 @@ export default function AdminDashboardPage() {
           onNav={(v) => { setActiveView(v); setPage(1); }}
           isDark={isDark}
           user={currentUser}
-          onLogout={doLogout}
+          onLogout={requestLogout}
           collapsed={collapsed}
           ratingsOpen={ratingsOpen}
           onToggleRatings={() => setRatingsOpen((o) => !o)}
+          foundationNavOpen={foundationNavOpen}
+          onToggleFoundationNav={() => setFoundationNavOpen((o) => !o)}
+          navItems={sidebarNavItems}
+          foundationNavItems={foundationNavItems}
         />
       </div>
+
+      {/* Sign out confirm */}
+      <AnimatePresence>
+        {logoutConfirmOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+          >
+            <div
+              className="absolute inset-0 bg-black/55 backdrop-blur-2xl"
+              onClick={() => setLogoutConfirmOpen(false)}
+              aria-hidden="true"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              className={`relative w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+                isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={`px-5 py-4 border-b ${divider} flex items-center justify-between`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? "bg-red-500/10" : "bg-red-50"}`}>
+                    <LogOut size={18} className={isDark ? "text-red-400" : "text-red-600"} />
+                  </div>
+                  <div className="min-w-0">
+                    <div id="logout-confirm-title" className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      Confirm sign out
+                    </div>
+                    <div className={`text-xs ${textMuted}`}>Are you sure you want to sign out?</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(false)}
+                  className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="px-5 py-4 flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(false)}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                    isDark
+                      ? "bg-slate-800/60 border-slate-700 text-slate-200 hover:bg-slate-800"
+                      : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogoutConfirmOpen(false);
+                    setMobileSidebarOpen(false);
+                    doLogout();
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                    isDark
+                      ? "bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/20"
+                      : "bg-red-600 text-white hover:bg-red-700"
+                  }`}
+                >
+                  Yes, sign out
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile sidebar */}
       <AnimatePresence>
@@ -1672,10 +2347,14 @@ export default function AdminDashboardPage() {
               onNav={(v) => { setActiveView(v); setPage(1); setMobileSidebarOpen(false); }}
               isDark={isDark}
               user={currentUser}
-              onLogout={doLogout}
+              onLogout={requestLogout}
               collapsed={false}
               ratingsOpen={ratingsOpen}
               onToggleRatings={() => setRatingsOpen((o) => !o)}
+              foundationNavOpen={foundationNavOpen}
+              onToggleFoundationNav={() => setFoundationNavOpen((o) => !o)}
+              navItems={sidebarNavItems}
+              foundationNavItems={foundationNavItems}
             />
           </motion.div>
         )}
@@ -1684,7 +2363,7 @@ export default function AdminDashboardPage() {
       {/* Main content */}
       <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className={`sticky top-0 z-20 flex items-center gap-3 px-4 lg:px-6 py-3 border-b ${isDark ? "bg-slate-950/80 border-slate-800 backdrop-blur-md" : "bg-white/80 border-slate-200 backdrop-blur-md"}`}>
+        <header className={`sticky top-0 z-20 flex items-center gap-3 px-4 lg:px-6 py-3 border-b ${isDark ? "bg-slate-950/90 border-slate-700 backdrop-blur-md" : "bg-white/80 border-slate-200 backdrop-blur-md"}`}>
           {/* Mobile menu + collapse toggle */}
           <button
             className={`lg:hidden p-2 rounded-lg transition-colors ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
@@ -1746,6 +2425,43 @@ export default function AdminDashboardPage() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <AnimatePresence>
+            {deleteFeedback && (
+              <motion.div
+                role="alert"
+                aria-live="polite"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className={`mb-4 px-4 py-3 rounded-xl border text-sm font-medium flex items-center gap-2 ${
+                  deleteFeedback.type === "success"
+                    ? isDark
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                      : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : isDark
+                      ? "bg-red-500/10 border-red-500/30 text-red-300"
+                      : "bg-red-50 border-red-200 text-red-800"
+                }`}
+              >
+                {deleteFeedback.type === "success" ? (
+                  <CheckCircle size={16} className="shrink-0" />
+                ) : deleteFeedback.type === "deleted" ? (
+                  <Trash2 size={16} className="shrink-0" />
+                ) : (
+                  <AlertCircle size={16} className="shrink-0" />
+                )}
+                {deleteFeedback.message}
+                <button
+                  type="button"
+                  onClick={() => setDeleteFeedback(null)}
+                  className="ml-auto p-1 rounded-lg opacity-70 hover:opacity-100"
+                  aria-label="Dismiss"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView}
@@ -1759,6 +2475,29 @@ export default function AdminDashboardPage() {
               {activeView === "individual" && renderComplaintsTable(true)}
               {activeView === "dept-ratings" && renderRatings("dept")}
               {activeView === "hospital-ratings" && renderRatings("hospital")}
+              {activeView === "profile" && currentUser && (
+                <UserProfile
+                  isDark={isDark}
+                  currentUser={currentUser}
+                  cardBg={cardBg}
+                  textMuted={textMuted}
+                  inputCls={inputCls}
+                  divider={divider}
+                  onUserUpdated={(user) => setCurrentUser(normalizeAuthUser(user))}
+                />
+              )}
+              {activeView === "users" && currentUser && (
+                <UserManagement
+                  isDark={isDark}
+                  currentUser={currentUser}
+                  cardBg={cardBg}
+                  textMuted={textMuted}
+                  inputCls={inputCls}
+                  divider={divider}
+                  tHead={tHead}
+                  tableHover={tableHover}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -1769,10 +2508,30 @@ export default function AdminDashboardPage() {
         {selected && (
           <ComplaintModal
             complaint={selected}
+            draftStatus={draftStatus}
             isDark={isDark}
             onClose={() => setSelected(null)}
-            onStatusChange={handleStatusChange}
+            onDraftStatusChange={setDraftStatus}
+            onSaveStatus={handleSaveStatus}
             updating={updatingStatus}
+            statusError={statusUpdateError}
+            statusSuccess={statusUpdateSuccess}
+            canChangeStatus={hasPerm(currentUser, PERMS.changeComplaint)}
+            canDelete={canDeleteComplaint}
+            onDelete={() => setDeleteTarget({ kind: "complaint", item: selected })}
+            deleting={deletingRecord}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <DeleteConfirmDialog
+            target={deleteTarget}
+            isDark={isDark}
+            deleting={deletingRecord}
+            onCancel={() => !deletingRecord && setDeleteTarget(null)}
+            onConfirm={() => void handleConfirmDelete()}
           />
         )}
       </AnimatePresence>

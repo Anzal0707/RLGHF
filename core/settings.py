@@ -30,8 +30,24 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY not found in .env file. Make sure it's defined (e.g., SECRET_KEY=your-key).")
 
 DEBUG = os.environ.get('DEBUG', '0') == '1'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+
+
+def _env_list(name: str, default: str) -> list[str]:
+    return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
+
+
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+CORS_ALLOWED_ORIGINS = _env_list('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+
+# Same Wi‑Fi mobile testing (DEBUG only): accept LAN hosts and frontend origins
+if DEBUG and os.environ.get('DJANGO_DEV_ALLOW_LAN', '1') == '1':
+    ALLOWED_HOSTS = ['*']
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r'^http://localhost:\d+$',
+        r'^http://127\.0\.0\.1:\d+$',
+        r'^http://192\.168\.\d{1,3}\.\d{1,3}:\d+$',
+        r'^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$',
+    ]
 
 # ========== DATABASE ==========
 DATABASES = {

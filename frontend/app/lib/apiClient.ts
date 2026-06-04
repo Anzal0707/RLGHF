@@ -1,4 +1,19 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+function resolveBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  if (typeof window === 'undefined') return configured;
+
+  const hostname = window.location.hostname;
+  const usePageHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+  if (usePageHost) {
+    return `http://${hostname}:8000/api`;
+  }
+  return configured;
+}
 
 export interface ApiErrorDetail {
   message: string;
@@ -22,21 +37,43 @@ export class ApiError extends Error {
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean>;
+  _retried?: boolean;
 }
 
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { params, headers: customHeaders, ...restOptions } = options;
+let refreshInFlight: Promise<string | null> | null = null;
 
-  // Build URL with query parameters
-  let url = `${BASE_URL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(padded)) as { exp?: number };
+  } catch {
+    return null;
+  }
+}
+
+function isAccessTokenExpired(token: string, skewSec = 30): boolean {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return true;
+  return payload.exp * 1000 <= Date.now() + skewSec * 1000;
+}
+
+async function ensureValidAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+  if (token && !isAccessTokenExpired(token)) return token;
+  return refreshAccessToken();
+}
+
+function buildResourceUrl(endpoint: string, params?: Record<string, string | number | boolean>): string {
+  let url = `${resolveBaseUrl().replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
   if (url.endsWith('/') === false && !url.includes('?')) {
-    // Django REST Framework likes trailing slashes unless configured otherwise
-    // Let's ensure we append a trailing slash to resources to avoid redirects, but don't add to query params
     if (!endpoint.includes('.')) {
       url += '/';
     }
   }
-
   if (params) {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, val]) => {
@@ -46,12 +83,52 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     });
     const queryString = searchParams.toString();
     if (queryString) {
-      // If trailing slash was added, make sure query params are appended after it
       url += `?${queryString}`;
     }
   }
+  return url;
+}
 
-  // Set default headers
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const refresh = localStorage.getItem('refresh_token');
+  if (!refresh) return null;
+
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(buildResourceUrl('auth/token/refresh'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ refresh }),
+      });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      if (data.access) {
+        localStorage.setItem('access_token', data.access);
+        return data.access as string;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  const { params, headers: customHeaders, _retried, ...restOptions } = options;
+  const url = buildResourceUrl(endpoint, params);
+
+  const isAuthEndpoint =
+    endpoint.includes('auth/admin/login') || endpoint.includes('auth/token/refresh');
+
   const headers = new Headers(customHeaders);
   if (!headers.has('Content-Type') && !(restOptions.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
@@ -60,11 +137,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     headers.set('Accept', 'application/json');
   }
 
-  // Auto-inject JWT token if it exists in localStorage
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    if (token && !headers.has('Authorization')) {
+  if (typeof window !== 'undefined' && !isAuthEndpoint) {
+    const token = _retried
+      ? localStorage.getItem('access_token') || localStorage.getItem('token')
+      : await ensureValidAccessToken();
+    if (token) {
       headers.set('Authorization', `Bearer ${token}`);
+    } else {
+      headers.delete('Authorization');
     }
   }
 
@@ -76,7 +156,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   try {
     const response = await fetch(url, config);
 
-    // Handle No Content response
     if (response.status === 204) {
       return {} as T;
     }
@@ -90,7 +169,19 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     }
 
     if (!response.ok) {
-      // Parse django REST framework error structure
+      if (
+        response.status === 401 &&
+        !_retried &&
+        !isAuthEndpoint &&
+        typeof window !== 'undefined'
+      ) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          const { headers: _omit, ...retryOptions } = options;
+          return request<T>(endpoint, { ...retryOptions, _retried: true });
+        }
+      }
+
       let errorMessage = 'An error occurred during the API request.';
       let details: any = null;
 
@@ -101,7 +192,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
         } else if (responseData.message) {
           errorMessage = responseData.message;
         } else {
-          // If it's a validation error with field names
           const firstKey = Object.keys(responseData)[0];
           if (firstKey) {
             const val = responseData[firstKey];
@@ -121,12 +211,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     if (error instanceof ApiError) {
       throw error;
     }
-    // Network or other fetch errors
     throw new ApiError(500, 'Network Error', error instanceof Error ? error.message : 'Network request failed');
   }
 }
 
 export const apiClient = {
+  ensureValidAccessToken,
+
   get<T>(endpoint: string, options?: Omit<RequestOptions, 'method' | 'body'>) {
     return request<T>(endpoint, { ...options, method: 'GET' });
   },

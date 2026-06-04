@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
+/* ── Design tokens (light default) ───────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f7f6;
+  --foreground: #0f172a;
+  --surface-base: #ffffff;
+  --surface-raised: #f8fafc;
+  --surface-overlay: #ffffff;
+  --surface-muted: #f1f5f9;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-inverse: #f8fafc;
   --primary: #0d9488;
   --primary-light: #14b8a6;
   --primary-dark: #0f766e;
@@ -14,12 +25,24 @@
   --info: #3b82f6;
   --dept-border-light: #10b981;
   --dept-border-dark: #14b8a6;
+  --shadow-color: rgba(15, 23, 42, 0.08);
 }
 
+/* ── Dark mode tokens (system preference + JS toggle via .dark / data-theme) ─ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #020617;
+    --foreground: #f1f5f9;
+    --surface-base: #0f172a;
+    --surface-raised: #1e293b;
+    --surface-overlay: #0f172a;
+    --surface-muted: #1e293b;
+    --border-default: #334155;
+    --border-strong: #475569;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-inverse: #0f172a;
     --primary: #14b8a6;
     --primary-light: #2dd4bf;
     --primary-dark: #0d9488;
@@ -29,13 +52,50 @@
     --warning: #fbbf24;
     --error: #f87171;
     --info: #60a5fa;
+    --shadow-color: rgba(0, 0, 0, 0.45);
   }
+}
+
+:root.dark,
+:root[data-theme="dark"] {
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --surface-base: #0f172a;
+  --surface-raised: #1e293b;
+  --surface-overlay: #0f172a;
+  --surface-muted: #1e293b;
+  --border-default: #334155;
+  --border-strong: #475569;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0f172a;
+  --primary: #14b8a6;
+  --primary-light: #2dd4bf;
+  --primary-dark: #0d9488;
+  --secondary: #34d399;
+  --accent: #6ee7b7;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+  --shadow-color: rgba(0, 0, 0, 0.45);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), var(--font-noto-sans-devanagari), Arial, Helvetica, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 @keyframes blink {
@@ -90,7 +150,7 @@ body {
 }
 
 .hero-gradient-text-dark {
-  background: linear-gradient(90deg, #14b8a6, #34d399, #14b8a6);
+  background: linear-gradient(90deg, #5eead4, #34d399, #5eead4);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -98,12 +158,29 @@ body {
   animation: gradient-text 3s linear infinite;
 }
 
+/* Patient portal headline — soft blue → teal (static, no shimmer) */
+.portal-headline-gradient-light {
+  background: linear-gradient(90deg, #1d4ed8 0%, #0d9488 52%, #0891b2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.portal-headline-gradient-dark {
+  background: linear-gradient(90deg, #93c5fd 0%, #5eead4 48%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
 .hero-glow-light {
   filter: drop-shadow(0 0 30px rgba(16, 185, 129, 0.2));
 }
 
 .hero-glow-dark {
-  filter: drop-shadow(0 0 30px rgba(20, 184, 166, 0.3));
+  filter: drop-shadow(0 0 30px rgba(20, 184, 166, 0.35));
 }
 
 .animate-slide-up {
@@ -140,18 +217,16 @@ body {
   75% { opacity: 0.9; box-shadow: 0 0 14px 3px rgba(16, 185, 129, 0.35); }
 }
 
-/* Twinkling border — applied to a standalone border div, NOT the button */
 .dept-twinkle-border {
   border: 2px solid #10b981 !important;
   animation: border-twinkle 2.5s ease-in-out infinite !important;
 }
 
 .dept-twinkle-border-dark {
-  border: 2px solid #14b8a6 !important;
+  border: 2px solid #2dd4bf !important;
   animation: border-twinkle 2.5s ease-in-out infinite !important;
 }
 
-/* Hover rotating loading border */
 .dept-border-spin {
   animation: border-spin 2s linear infinite !important;
   background: conic-gradient(from 0deg, transparent 0deg 240deg, #10b981 280deg, #14b8a6 320deg, #34d399 340deg, transparent 360deg) !important;
