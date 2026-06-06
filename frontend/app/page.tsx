@@ -33,6 +33,8 @@ import {
 import { Home as HomeIcon, Send, MessageSquare, User, Building2, CheckCircle2 } from "lucide-react";
 
 import HospitalRatingModal from "./components/HospitalRatingModal";
+import HospitalRatingCard from "./components/HospitalRatingCard";
+import type { HospitalRatingPayload } from "./components/HospitalRatingModal";
 import ModalShell, { Z_MODAL_BACKDROP } from "./components/ModalShell";
 
 const PORTAL_REVEAL_EASE = [0.22, 1, 0.36, 1] as const;
@@ -207,7 +209,7 @@ const translations = {
 
 
 
-    contactSection: "Complainant Contact Details (Optional)",
+    contactSection: "Complainant Contact Details",
 
 
 
@@ -223,7 +225,7 @@ const translations = {
 
 
 
-    patientIdLabel: "Patient ID / UHID (Optional)",
+    patientIdLabel: "Patient ID / EMR ID (Optional)",
 
 
 
@@ -289,7 +291,7 @@ const translations = {
 
     validationError: "Please provide a written description or upload a voice recording.",
 
-
+    indRequiredFieldsError: "Please complete all required fields before submitting your complaint.",
 
     contactValidationError: "Please provide your name or phone number when submitting non-anonymously.",
 
@@ -627,7 +629,7 @@ const translations = {
 
 
 
-    contactSection: "गुनासोकर्ताको सम्पर्क विवरण (ऐच्छिक)",
+    contactSection: "गुनासोकर्ताको सम्पर्क विवरण",
 
 
 
@@ -643,7 +645,7 @@ const translations = {
 
 
 
-    patientIdLabel: "बिरामी आईडी / UHID (ऐच्छिक)",
+    patientIdLabel: "बिरामी आईडी / EMR ID (ऐच्छिक)",
 
 
 
@@ -709,7 +711,7 @@ const translations = {
 
     validationError: "कृपया अनिवार्य क्षेत्र भर्नुहोस्: विवरण (वा आवाज रेकर्ड गर्नुहोस्)।",
 
-
+    indRequiredFieldsError: "कृपया गुनासो पेश गर्नु अघि सबै अनिवार्य क्षेत्रहरू भर्नुहोस्।",
 
     contactValidationError: "गोप्य नराखेर पेश गर्दा कृपया आफ्नो नाम वा फोन नम्बर दिनुहोस्।",
 
@@ -1035,7 +1037,7 @@ const translations = {
 
 
 
-    contactSection: "शिकायतकर्ता संपर्क विवरण (वैकल्पिक)",
+    contactSection: "शिकायतकर्ता संपर्क विवरण",
 
 
 
@@ -1051,7 +1053,7 @@ const translations = {
 
 
 
-    patientIdLabel: "मरीज़ आईडी / UHID (वैकल्पिक)",
+    patientIdLabel: "मरीज़ आईडी / EMR ID (वैकल्पिक)",
 
 
 
@@ -1117,7 +1119,7 @@ const translations = {
 
     validationError: "कृपया अनिवार्य क्षेत्र भरें: विवरण (या आवाज रिकॉर्ड करें)।",
 
-
+    indRequiredFieldsError: "कृपया शिकायत दर्ज करने से पहले सभी आवश्यक फ़ील्ड भरें।",
 
     contactValidationError: "बिना नाम के सबमिट करते समय कृपया अपना नाम या फ़ोन नंबर दें।",
 
@@ -1310,6 +1312,29 @@ type LangKey = "en" | "ne" | "hi";
 
 
 
+
+const DepartmentPlaceholderIcon = ({ className = "w-full h-full" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    className={className}
+    aria-hidden="true"
+  >
+    <path
+      d="M3 21h18M5 21V7.5L12 4l7 3.5V21M9 21v-5h6v5"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 8.5v3.25M10.375 10.125h3.25"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+    />
+  </svg>
+);
 
 const CustomDepartmentSelect = ({
 
@@ -1532,13 +1557,18 @@ const CustomDepartmentSelect = ({
 
 
           ) : (
-
-
-
-            <span className={isDark ? "text-slate-400 font-normal" : "text-slate-500 font-normal"}>{placeholder}</span>
-
-
-
+            <>
+              <div
+                className={`w-6 h-6 shrink-0 flex items-center justify-center ${
+                  isDark ? "text-teal-400/90" : "text-teal-600"
+                }`}
+              >
+                <DepartmentPlaceholderIcon />
+              </div>
+              <span className={`truncate font-medium ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                {placeholder}
+              </span>
+            </>
           )}
 
 
@@ -2627,15 +2657,16 @@ export default function Home() {
 
 
 
+  const scrollPageToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const exitDepartmentSelection = () => {
 
     setFocusDepartmentSection(false);
 
-    if (mainScrollRef.current) {
-
-      mainScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
-
-    }
+    scrollPageToTop();
 
   };
 
@@ -2896,13 +2927,6 @@ export default function Home() {
 
   }, [lang, theme, isModalOpen, modalView, isIndividualModalOpen]);
 
-  // Close department complaint form if opened without a selected department
-  useEffect(() => {
-    if (isModalOpen && modalView === "complaint" && !department.trim()) {
-      setModalView("rating");
-      setIsModalOpen(false);
-    }
-  }, [isModalOpen, modalView, department]);
 
 
 
@@ -2919,21 +2943,7 @@ export default function Home() {
 
 
     const timer = window.setTimeout(() => {
-
-
-
-      if (mainScrollRef.current) {
-
-
-
-        mainScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
-
-
-
-      }
-
-
-
+      scrollPageToTop();
     }, 50);
 
 
@@ -2949,6 +2959,34 @@ export default function Home() {
     const timer = window.setTimeout(() => setErrorMsg(null), 5000);
     return () => window.clearTimeout(timer);
   }, [errorMsg, t.dailyRatingLimit]);
+
+  const individualComplaintValidationError = (): string | null => {
+    if (!indName.trim() && !indAppearance.trim()) return t.indRequiredFieldsError;
+    if (!description.trim() && !audioBlob) return t.indRequiredFieldsError;
+    if (
+      !isAnonymous &&
+      (!complainantName.trim() || !complainantPhone.trim() || !/^\d{10}$/.test(complainantPhone.trim()))
+    ) {
+      return t.indRequiredFieldsError;
+    }
+    return null;
+  };
+
+  const isBackendRequiredFieldsRejection = (message: string): boolean => {
+    const lower = message.toLowerCase();
+    return (
+      lower.includes("written description") ||
+      lower.includes("voice recording") ||
+      lower.includes("description")
+    );
+  };
+
+  useEffect(() => {
+    if (!isIndividualModalOpen || !isIndividualComplaint) return;
+    if (errorMsg !== t.indRequiredFieldsError) return;
+    const timer = window.setTimeout(() => setErrorMsg(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [errorMsg, t.indRequiredFieldsError, isIndividualModalOpen, isIndividualComplaint]);
 
 
 
@@ -3490,6 +3528,17 @@ export default function Home() {
 
 
 
+  const handleHospitalRatingHaveComplaint = (data: HospitalRatingPayload) => {
+    setRating(data.rating);
+    setSelectedRating(data.rating);
+    setRatingFeedback(data.text);
+    dismissHospitalGate();
+    setIsModalOpen(false);
+    setIsIndividualComplaint(false);
+    setIsIndividualModalOpen(false);
+    setIsComplaintTypeModalOpen(true);
+  };
+
   const handleHospitalRatingSubmit = async (
 
     ratingValue: number,
@@ -3594,14 +3643,9 @@ export default function Home() {
     setErrorMsg(null);
 
     if (isIndividualComplaint) {
-      if (!indName.trim() && !indAppearance.trim()) {
-        const errorText =
-          lang === "ne"
-            ? "कृपया व्यक्तिको नाम वा पहिचान विवरण प्रदान गर्नुहोस्।"
-            : lang === "hi"
-              ? "कृपया व्यक्ति का नाम या पहचान विवरण प्रदान करें।"
-              : "Please provide the individual's name or a description to identify them.";
-        setErrorMsg(errorText);
+      const indValidationError = individualComplaintValidationError();
+      if (indValidationError) {
+        setErrorMsg(indValidationError);
         return;
       }
     } else if (!department.trim()) {
@@ -3615,76 +3659,29 @@ export default function Home() {
       return;
     }
 
-    let complaintDescription = description;
-    if (isIndividualComplaint && !description.trim() && !audioBlob) {
-      const parts = [
-        indName.trim() ? `Name: ${indName.trim()}` : "",
-        indRole.trim() ? `Role: ${indRole.trim()}` : "",
-        indAppearance.trim() ? `Appearance: ${indAppearance.trim()}` : "",
-      ].filter(Boolean);
-      complaintDescription = parts.join("\n");
-    }
+    if (!isIndividualComplaint) {
+      const hasDescriptionOrVoice = description.trim().length > 0 || audioBlob !== null;
 
-    const hasDescriptionOrVoice = complaintDescription.trim().length > 0 || audioBlob !== null;
-
-    if (!hasDescriptionOrVoice) {
-      setErrorMsg(t.validationError);
-      return;
-    }
-
-
-
-
-
-
-
-    if (!isAnonymous) {
-
-
-
-      if (!complainantName.trim() || !complainantPhone.trim() || !/^\d{10}$/.test(complainantPhone.trim())) {
-
-
-
-        const errorText = lang === 'ne'
-
-
-
-          ? "कृपया आफ्नो नाम र १० अंकको फोन नम्बर प्रदान गर्नुहोस्।"
-
-
-
-          : lang === 'hi'
-
-
-
-            ? "कृपया अपना नाम और 10 अंकों का फोन नंबर प्रदान करें।"
-
-
-
-            : "Please provide your name and a 10-digit phone number.";
-
-
-
-        setErrorMsg(errorText);
-
-
-
+      if (!hasDescriptionOrVoice) {
+        setErrorMsg(t.validationError);
         return;
-
-
-
       }
 
-
-
+      if (!isAnonymous) {
+        if (!complainantName.trim() || !complainantPhone.trim() || !/^\d{10}$/.test(complainantPhone.trim())) {
+          const errorText =
+            lang === "ne"
+              ? "कृपया आफ्नो नाम र १० अंकको फोन नम्बर प्रदान गर्नुहोस्।"
+              : lang === "hi"
+                ? "कृपया अपना नाम और 10 अंकों का फोन नंबर प्रदान करें।"
+                : "Please provide your name and a 10-digit phone number.";
+          setErrorMsg(errorText);
+          return;
+        }
+      }
     }
 
-
-
-
-
-
+    const complaintDescription = description;
 
     setSubmitting(true);
 
@@ -3846,25 +3843,14 @@ export default function Home() {
 
 
     } catch (err) {
-
-
-
       if (err instanceof ApiError) {
-
-
-
-        setErrorMsg(`${err.status} ${err.statusText}: ${err.message}`);
-
-
-
+        if (isIndividualComplaint && isBackendRequiredFieldsRejection(err.message)) {
+          setErrorMsg(t.indRequiredFieldsError);
+        } else {
+          setErrorMsg(`${err.status} ${err.statusText}: ${err.message}`);
+        }
       } else {
-
-
-
         setErrorMsg(err instanceof Error ? err.message : "Error submitting feedback.");
-
-
-
       }
 
 
@@ -4026,7 +4012,7 @@ export default function Home() {
 
 
   const isDeptComplaintFormOpen =
-    isModalOpen && modalView === "complaint" && Boolean(department.trim()) && !isIndividualComplaint;
+    isModalOpen && modalView === "complaint" && !isIndividualComplaint;
 
 
 
@@ -4034,7 +4020,19 @@ export default function Home() {
 
   const isPageScrollLocked = isComplaintFormOpen || focusDepartmentSection || Boolean(successTicketId);
 
-  const showHospitalRatingGate = ratingHydrated && !hospitalRated && !hospitalGateDismissed;
+  const useDocumentScroll = !isPageScrollLocked;
+
+  // Homepage inline rating is the default entry; do not auto-open the hospital rating gate on load.
+  const showHospitalRatingGate = false;
+
+  const inlineRatingResetSignal = [
+    isModalOpen,
+    isComplaintTypeModalOpen,
+    isIndividualModalOpen,
+    focusDepartmentSection,
+    successTicketId,
+    showHospitalRatingGate,
+  ].join("|");
 
   const isAnyModalOpen =
     isScrollLocked || showHospitalRatingGate;
@@ -4942,17 +4940,21 @@ export default function Home() {
       </div>
 
       {/* Page body — modals overlay this region only (header stays above) */}
-      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden isolate">
+      <div
+        className={`relative flex-1 flex flex-col overflow-x-hidden isolate ${
+          useDocumentScroll ? "" : "min-h-0"
+        }`}
+      >
 
       <main
         ref={mainScrollRef}
         aria-hidden={isAnyModalOpen}
-        className={`relative flex-1 w-full min-w-0 max-w-full mx-auto px-4 sm:px-6 lg:px-10 overflow-hidden ${
+        className={`relative w-full min-w-0 max-w-full mx-auto px-4 sm:px-6 lg:px-10 overflow-x-hidden ${
           isComplaintFormOpen
-            ? "min-h-0 flex flex-col py-0"
+            ? "min-h-0 flex-1 flex flex-col py-0 overflow-hidden"
             : focusDepartmentSection
-              ? "min-h-0 overflow-y-auto overscroll-y-contain justify-start py-4 sm:py-6"
-              : "py-8 sm:py-12 flex flex-col justify-center"
+              ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain justify-start py-4 sm:py-6"
+              : "pt-[max(1.25rem,env(safe-area-inset-top,0px))] sm:pt-8 md:pt-10 pb-8 sm:pb-12 flex flex-col justify-center"
         }`}
       >
 
@@ -4966,7 +4968,7 @@ export default function Home() {
 
 
 
-          <div className="space-y-8 animate-fade-in">
+          <div className="space-y-8 animate-fade-in overflow-visible">
 
 
 
@@ -5062,7 +5064,7 @@ export default function Home() {
 
 
 
-            <div className="space-y-5 sm:space-y-6 md:space-y-8 text-center sm:text-left pt-4 sm:pt-5 md:pt-6 mt-2 sm:mt-3">
+            <div className="space-y-5 sm:space-y-6 md:space-y-8 text-center sm:text-left overflow-visible pt-1 sm:pt-2 md:pt-3">
 
 
 
@@ -5070,7 +5072,7 @@ export default function Home() {
                 initial={reduceMotion ? false : { opacity: 0, x: -28 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.7, ease: PORTAL_REVEAL_EASE }}
-                className={`block overflow-visible pt-1.5 sm:pt-2 pb-1 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.08] text-balance ${
+                className={`block overflow-visible pt-2 sm:pt-3 md:pt-4 pb-1 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.08] text-balance ${
                   isDark ? "portal-headline-gradient-dark hero-glow-dark" : "portal-headline-gradient-light hero-glow-light"
                 }`}
               >
@@ -5089,18 +5091,6 @@ export default function Home() {
                 className="max-w-4xl mx-auto sm:mx-0 space-y-4 sm:space-y-5 md:space-y-6"
                 role="doc-subtitle"
               >
-                <motion.p
-                  initial={reduceMotion ? false : { opacity: 0, x: -22 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={
-                    reduceMotion ? { duration: 0 } : { duration: 0.65, ease: PORTAL_REVEAL_EASE, delay: 0.14 }
-                  }
-                  className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-relaxed sm:leading-loose text-pretty ${
-                    isDark ? "text-slate-100" : "text-slate-800"
-                  }`}
-                >
-                  {t.portalSubtitle1}
-                </motion.p>
                 {reduceMotion ? (
                   <p
                     className={`text-base sm:text-lg md:text-xl lg:text-2xl font-medium leading-relaxed sm:leading-loose text-pretty ${
@@ -5137,7 +5127,18 @@ export default function Home() {
                 )}
               </div>
 
-
+              <HospitalRatingCard
+                isDark={isDark}
+                lang={lang}
+                isRated={ratingHydrated && hospitalRated}
+                ratedBadge={t.ratedBadge}
+                scrollContainerRef={mainScrollRef}
+                resetSignal={inlineRatingResetSignal}
+                onSubmit={async (data) => {
+                  await handleHospitalRatingSubmit(data.rating, data.text);
+                }}
+                onHaveComplaint={handleHospitalRatingHaveComplaint}
+              />
 
             </div>
 
@@ -6369,7 +6370,7 @@ export default function Home() {
 
 
 
-                            {/* Patient UHID number */}
+                            {/* Patient EMR ID */}
 
 
 
@@ -6807,6 +6808,21 @@ export default function Home() {
                       </div>
                     )}
 
+                    {/* Complaint Description */}
+                    <div className="space-y-2">
+                      <label htmlFor="indModalDescription" className={formLabel}>
+                        {t.descriptionLabel} {!audioBlob && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      <textarea
+                        id="indModalDescription"
+                        rows={4}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={t.descriptionPlaceholder}
+                        className={formInput}
+                      />
+                    </div>
+
                     {/* Anonymous Toggle */}
                     <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${isDark ? "bg-slate-800/70 border-slate-600/80 backdrop-blur-md shadow-lg shadow-slate-900/20" : "bg-white/60 border-slate-200/80 backdrop-blur-md shadow-lg shadow-slate-200/50"}`}>
                       <div className="flex items-center gap-2">
@@ -6835,49 +6851,124 @@ export default function Home() {
 
                     {/* Contact Details (when not anonymous) */}
                     {!isAnonymous && (
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <label htmlFor="indModalContact" className={`block text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                            {t.phoneLabel}
-                          </label>
-                          <input
-                            id="indModalContact"
-                            type="text"
-                            value={complainantPhone}
-                            onChange={(e) => setComplainantPhone(e.target.value)}
-                            className={`w-full px-4 py-3 rounded-xl border-2 transition-colors ${isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"}`}
-                            placeholder={t.phonePlaceholder}
-                          />
+                      <>
+                        <div
+                          className={`p-5 rounded-2xl border space-y-4 animate-fade-in ${
+                            isDark ? "bg-slate-800/70 border-slate-600" : "bg-slate-50 border-slate-200"
+                          }`}
+                        >
+                          <h3
+                            className={`text-sm sm:text-base font-semibold pb-2 border-b ${
+                              isDark ? "text-white border-slate-700" : "text-slate-900 border-slate-200"
+                            }`}
+                          >
+                            {t.contactSection}
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label htmlFor="indModalComplainantName" className={formLabel}>
+                                {t.nameLabel} <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                id="indModalComplainantName"
+                                type="text"
+                                value={complainantName}
+                                onChange={(e) => setComplainantName(e.target.value)}
+                                className={formInput}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label htmlFor="indModalContact" className={formLabel}>
+                                {t.phoneLabel} <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                id="indModalContact"
+                                type="tel"
+                                maxLength={10}
+                                pattern="\d{10}"
+                                onKeyPress={(e) => !/[0-9]/.test(e.key) && e.preventDefault()}
+                                value={complainantPhone}
+                                onChange={(e) => setComplainantPhone(e.target.value.replace(/\D/g, ""))}
+                                placeholder={t.phonePlaceholder}
+                                className={formInput}
+                              />
+                            </div>
+                          </div>
+                          <p className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            {t.phoneHelp}
+                          </p>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label htmlFor="indModalUHID" className={`block text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                        <div className="space-y-2">
+                          <label htmlFor="indModalEmrId" className={formLabel}>
                             {t.patientIdLabel}
                           </label>
                           <input
-                            id="indModalUHID"
+                            id="indModalEmrId"
                             type="text"
                             value={patientId}
                             onChange={(e) => setPatientId(e.target.value)}
-                            className={`w-full px-4 py-3 rounded-xl border-2 transition-colors ${isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"}`}
                             placeholder={t.patientIdPlaceholder}
+                            className={formInput}
                           />
                         </div>
-                      </div>
+                      </>
                     )}
 
                     {/* File Upload */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="indModalFile" className={`block text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                    <div className="space-y-2">
+                      <label htmlFor="indModalFile" className={`${formLabel} flex items-center gap-2`}>
+                        <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
                         {t.attachmentLabel}
                       </label>
-                      <input
-                        id="indModalFile"
-                        type="file"
-                        onChange={(e) => setAttachment(e.target.files?.[0] || null)}
-                        className={`w-full px-4 py-3 rounded-xl border-2 transition-colors ${isDark ? "bg-slate-800 border-slate-600 text-white placeholder:text-slate-400 file:text-teal-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 file:text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"}`}
-                      />
+                      <div className="relative group cursor-pointer">
+                        <input
+                          id="indModalFile"
+                          type="file"
+                          accept="image/*,video/*,application/pdf"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setAttachment(e.target.files[0]);
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div
+                          className={`w-full px-4 py-4 rounded-xl border border-dashed transition-all text-sm flex items-center justify-between ${
+                            isDark
+                              ? "border-slate-700 bg-slate-900/20 group-hover:bg-slate-900/30 text-slate-300"
+                              : "border-slate-300 bg-[#fbfdfd] group-hover:bg-slate-50 text-slate-500"
+                          }`}
+                        >
+                          <span className="truncate">
+                            {attachment ? attachment.name : t.chooseFilePlaceholder}
+                          </span>
+                          <svg
+                            className={`w-5 h-5 transition-colors shrink-0 ${
+                              isDark ? "text-teal-400 group-hover:text-teal-300" : "text-teal-600 group-hover:text-teal-700"
+                            }`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Form Validation Errors */}
+                    {errorMsg && !isDailyRatingLimitMsg && (
+                      <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-500 flex items-start gap-3 animate-pulse">
+                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="leading-relaxed font-semibold">{errorMsg}</span>
+                      </div>
+                    )}
 
                     {/* Submit Button */}
                     <button
@@ -6938,14 +7029,9 @@ export default function Home() {
                         setIsComplaintTypeModalOpen(false);
                         setIsIndividualComplaint(false);
                         setIsIndividualModalOpen(false);
-                        if (department.trim()) {
-                          setModalView("complaint");
-                          setIsModalOpen(true);
-                        } else {
-                          setIsModalOpen(false);
-                          setModalView("rating");
-                          setFocusDepartmentSection(true);
-                        }
+                        setFocusDepartmentSection(false);
+                        setModalView("complaint");
+                        setIsModalOpen(true);
                       }}
                       className={`p-6 rounded-2xl border-2 transition-all cursor-pointer text-left group ${isDark
                         ? "bg-slate-800/50 border-[#14b8a6] hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-500/20 hover:text-white text-slate-100"
@@ -7106,21 +7192,12 @@ export default function Home() {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-0 sm:pt-2">
-                  <button
-                    onClick={handleResetForm}
-                    className={`flex-1 sm:flex-none px-4 sm:px-8 py-2 sm:py-3 rounded-xl text-sm sm:text-base font-black tracking-wide transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${isDark ? "bg-slate-800/50 border-2 border-slate-600 text-slate-200 hover:bg-teal-600 hover:border-teal-500 hover:text-white hover:shadow-lg hover:shadow-teal-500/20" : "bg-slate-100 border-2 border-slate-300 text-slate-700 hover:bg-teal-600 hover:border-teal-600 hover:text-white hover:shadow-lg hover:shadow-teal-600/20"}`}
-                  >
-                    <motion.div animate={{ rotate: [-10, 10, -10] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }} style={{ originY: 0.5, originX: 0.5 }}>
-                      <HomeIcon className="w-5 h-5" />
-                    </motion.div>
-                    {t.btnHome}
-                  </button>
                   {successType === "rating" && hasUnratedDepartment && (
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={goToDepartmentSelection}
-                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold tracking-wide transition-all cursor-pointer text-sm sm:text-base ${isDark ? "bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 shadow-lg shadow-teal-500/10" : "bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/10"}`}
+                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold tracking-wide transition-all cursor-pointer text-sm sm:text-base ${isDark ? "bg-slate-800/50 border-2 border-slate-600 text-slate-200 hover:bg-gradient-to-r hover:from-teal-500 hover:to-emerald-400 hover:border-teal-500 hover:text-slate-950 hover:shadow-lg hover:shadow-teal-500/10" : "bg-slate-100 border-2 border-slate-300 text-slate-700 hover:bg-teal-600 hover:border-teal-600 hover:text-white hover:shadow-lg hover:shadow-teal-600/20"}`}
                     >
                       <motion.div animate={{ rotate: [-10, 10, -10] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }} style={{ originY: 0.5, originX: 0.5 }}>
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -7130,6 +7207,19 @@ export default function Home() {
                       {ratedDepartments.size === 0 ? t.rateDepartments : t.rateOtherDepartment}
                     </motion.button>
                   )}
+                  <button
+                    onClick={handleResetForm}
+                    className={`flex-1 sm:flex-none px-4 sm:px-8 py-2 sm:py-3 rounded-xl text-sm sm:text-base font-black tracking-wide transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${
+                      isDark
+                        ? "bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 shadow-lg shadow-teal-500/10"
+                        : "bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/10"
+                    }`}
+                  >
+                    <motion.div animate={{ rotate: [-10, 10, -10] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }} style={{ originY: 0.5, originX: 0.5 }}>
+                      <HomeIcon className="w-5 h-5" />
+                    </motion.div>
+                    {t.btnHome}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -7147,16 +7237,7 @@ export default function Home() {
           onSubmit={async (data) => {
             await handleHospitalRatingSubmit(data.rating, data.text);
           }}
-          onHaveComplaint={(data) => {
-            setRating(data.rating);
-            setSelectedRating(data.rating);
-            setRatingFeedback(data.text);
-            dismissHospitalGate();
-            setIsModalOpen(false);
-            setIsIndividualComplaint(false);
-            setIsIndividualModalOpen(false);
-            setIsComplaintTypeModalOpen(true);
-          }}
+          onHaveComplaint={handleHospitalRatingHaveComplaint}
           onClose={dismissHospitalGate}
         />
         </div>

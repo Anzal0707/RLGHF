@@ -38,9 +38,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${notoSansDevanagari.variable} h-full w-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${notoSansDevanagari.variable} min-h-dvh w-full antialiased`}
     >
-      <body className="min-h-dvh w-full max-w-full overflow-x-hidden flex flex-col">{children}</body>
+      <body className="min-h-dvh w-full max-w-full overflow-x-hidden">{children}</body>
     </html>
   );
 }

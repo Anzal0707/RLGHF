@@ -165,6 +165,10 @@ html {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+  /* Prevent Devanagari ascenders from clipping with background-clip:text */
+  padding-block-start: 0.12em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .portal-headline-gradient-dark {
@@ -173,6 +177,9 @@ html {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+  padding-block-start: 0.12em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .hero-glow-light {

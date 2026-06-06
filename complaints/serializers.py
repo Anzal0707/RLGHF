@@ -57,6 +57,21 @@ class ComplaintSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'ticket_id', 'status', 'priority', 'created_at', 'updated_at']
 
+    def validate(self, data):
+        description = (data.get('description') or '').strip()
+
+        voice_file = data.get('voice_file')
+        if voice_file is None and hasattr(self, 'initial_data'):
+            voice_file = self.initial_data.get('voice_file')
+
+        if not description and not voice_file:
+            raise serializers.ValidationError(
+                'Please provide a written description or upload a voice recording.'
+            )
+
+        data['description'] = description or None
+        return data
+
 
 class ComplaintAdminSerializer(serializers.ModelSerializer):
     """Serializer for admin operations with full access"""

@@ -580,7 +580,7 @@ function ComplaintModal({
                 <div className={val}>{complaint.is_anonymous ? "Yes" : "No"}</div>
               </div>
               <div>
-                <div className={label}>Patient ID</div>
+                <div className={label}>EMR ID</div>
                 <div className={val}>{complaint.patient_id || "—"}</div>
               </div>
               {!complaint.is_anonymous && (
