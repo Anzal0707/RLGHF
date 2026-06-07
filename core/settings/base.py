@@ -1,12 +1,17 @@
+"""
+Shared Django settings for all environments.
+"""
 import os
 from pathlib import Path
 
-# Build paths
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# ========== MANUAL .env PARSER (handles BOM, spaces, quotes) ==========
-env_path = BASE_DIR / '.env'
-if env_path.exists():
+
+def load_env_file() -> None:
+    """Load backend/.env into os.environ when the file exists."""
+    env_path = BASE_DIR / '.env'
+    if not env_path.exists():
+        return
     with open(env_path, 'r', encoding='utf-8-sig') as f:
         for line in f:
             line = line.strip()
@@ -16,40 +21,31 @@ if env_path.exists():
                 key, value = line.split('=', 1)
                 key = key.strip()
                 value = value.strip()
-                # Remove surrounding quotes if any
-                if (value.startswith('"') and value.endswith('"')) or \
-                   (value.startswith("'") and value.endswith("'")):
+                if (value.startswith('"') and value.endswith('"')) or (
+                    value.startswith("'") and value.endswith("'")
+                ):
                     value = value[1:-1]
-                os.environ[key] = value
-else:
-    raise FileNotFoundError(f".env file not found at {env_path}")
-
-# ========== READ ENVIRONMENT VARIABLES ==========
-SECRET_KEY = os.environ.get('SECRET_KEY')
-if not SECRET_KEY:
-    raise ValueError("SECRET_KEY not found in .env file. Make sure it's defined (e.g., SECRET_KEY=your-key).")
-
-DEBUG = os.environ.get('DEBUG', '0') == '1'
+                os.environ.setdefault(key, value)
 
 
-def _env_list(name: str, default: str) -> list[str]:
+def env_list(name: str, default: str) -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
 
 
-ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-CORS_ALLOWED_ORIGINS = _env_list('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+load_env_file()
 
-# Same Wi‑Fi mobile testing (DEBUG only): accept LAN hosts and frontend origins
-if DEBUG and os.environ.get('DJANGO_DEV_ALLOW_LAN', '1') == '1':
-    ALLOWED_HOSTS = ['*']
-    CORS_ALLOWED_ORIGIN_REGEXES = [
-        r'^http://localhost:\d+$',
-        r'^http://127\.0\.0\.1:\d+$',
-        r'^http://192\.168\.\d{1,3}\.\d{1,3}:\d+$',
-        r'^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$',
-    ]
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError(
+        'SECRET_KEY is required. Set it in backend/.env or as an environment variable.'
+    )
 
-# ========== DATABASE ==========
+DEBUG = os.environ.get('DEBUG', '0') == '1'
+
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+CORS_ALLOWED_ORIGIN_REGEXES: list[str] = []
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -57,23 +53,18 @@ DATABASES = {
     }
 }
 
-# ========== APPLICATION ==========
 INSTALLED_APPS = [
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'drf_yasg',
     'django_filters',
-
-    # Local apps
     'accounts',
     'complaints',
     'analytics',
@@ -95,7 +86,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -109,7 +100,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# ========== PASSWORD VALIDATION ==========
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -117,30 +107,32 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ========== INTERNATIONALIZATION ==========
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kathmandu'
 USE_I18N = True
 USE_TZ = True
 
-# ========== STATIC & MEDIA ==========
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ========== REST FRAMEWORK ==========
+UNFOLD = {
+    'SITE_TITLE': 'RLG Admin',
+    'SITE_HEADER': 'Ramlal Golchha Eye Hospital Foundation',
+    'SITE_SUBHEADER': 'Administration',
+    'SITE_URL': '/',
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',   # Allow public complaint submission
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
