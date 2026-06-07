@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "python manage.py collectstatic --noinput"
+buildCommand = "SECRET_KEY=build-placeholder DJANGO_SETTINGS_MODULE=core.settings.production python manage.py collectstatic --noinput"
 
 [deploy]
 preDeployCommand = "python manage.py migrate --noinput"
