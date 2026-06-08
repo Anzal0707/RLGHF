@@ -1,0 +1,104 @@
+/* Isolated portal title — Devanagari-safe rendering (no background-clip:text) */
+
+.titleBase {
+  display: block;
+  overflow: visible;
+  text-wrap: balance;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.titleDevanagari {
+  font-family: var(--font-noto-sans-devanagari), var(--font-geist-sans), sans-serif;
+  line-height: 1.65;
+  padding-top: 3px;
+  padding-bottom: 4px;
+  overflow: visible;
+  -webkit-font-smoothing: antialiased;
+}
+
+.titleDevanagariLight {
+  color: #1e3a8a;
+  text-shadow: 0 0 24px rgba(37, 99, 235, 0.15);
+}
+
+.titleDevanagariDark {
+  color: #bfdbfe;
+  text-shadow: 0 0 22px rgba(59, 130, 246, 0.2);
+}
+
+.titleEnglish {
+  line-height: 1.15;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  overflow: visible;
+}
+
+/* Mobile-only: two-line center-aligned Devanagari block */
+.desktopTitle {
+  display: none;
+}
+
+.mobileTitleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  gap: 0;
+  margin: 0;
+  padding-top: 3px;
+  padding-bottom: 4px;
+  overflow: visible;
+}
+
+.mobileTitleLine {
+  display: block;
+  margin: 0;
+  padding: 2px 0;
+  line-height: 1.15;
+  overflow: visible;
+  text-align: center;
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .titleDevanagari {
+    font-size: clamp(1.5rem, 7vw, 2.125rem) !important;
+    line-height: 1.45;
+    padding-top: 4px;
+    padding-bottom: 6px;
+    overflow: visible;
+  }
+
+  .mobileTitleBlock {
+    gap: 0;
+    padding-top: 4px;
+    padding-bottom: 6px;
+    overflow: visible;
+  }
+
+  .mobileTitleLine {
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+  }
+}
+
+@media (min-width: 768px) {
+  .titleDevanagari {
+    line-height: 1.6;
+    padding-top: 2px;
+    padding-bottom: 3px;
+  }
+
+  .desktopTitle {
+    display: block;
+  }
+
+  .mobileTitleBlock {
+    display: none;
+  }
+}

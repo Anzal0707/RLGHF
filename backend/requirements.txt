@@ -1,0 +1,11 @@
+# Production dependencies (direct only — transitives installed by pip)
+Django==6.0.5
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-filter==25.2
+django-unfold==0.94.0
+dj-database-url==2.3.0
+gunicorn==26.0.0
+psycopg2-binary==2.9.12
+whitenoise==6.12.0

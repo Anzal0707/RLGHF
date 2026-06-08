@@ -1,0 +1,5 @@
+# Optional local/dev tools — not installed on Railway
+# pip install -r requirements-dev.txt
+
+-r requirements.txt
+ipython

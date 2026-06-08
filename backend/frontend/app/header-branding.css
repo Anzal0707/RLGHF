@@ -1,0 +1,71 @@
+/**
+ * Navbar header typography — loaded after globals.css, outside Tailwind layers.
+ * Same file in dev (:3000) and static export (:8000); do not duplicate in Tailwind classes.
+ */
+.hospital-brand-text-cluster--navbar .header-brand-name-half-md {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--font-roboto-condensed), Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--hospital-brand-name);
+  font-size: var(--header-brand-name-mobile) !important;
+  line-height: 1 !important;
+  letter-spacing: 0.028em !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+  margin: 0;
+  padding: 0;
+}
+
+.hospital-brand-text-cluster--navbar .header-brand-mgmt-half-md {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-weight: 500;
+  color: var(--hospital-brand-management);
+  font-size: var(--header-brand-mgmt-mobile) !important;
+  line-height: 1.08 !important;
+  letter-spacing: 0.02em !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  .hospital-brand-text-cluster--navbar .header-brand-name-half-md {
+    font-size: var(--header-brand-name-half) !important;
+    line-height: 1 !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .hospital-brand-text-cluster--navbar .header-brand-mgmt-half-md {
+    font-size: var(--header-brand-mgmt-half) !important;
+    line-height: 1.12 !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hospital-brand-text-cluster--navbar .header-brand-name-half-md {
+    font-size: var(--header-brand-name-desktop) !important;
+    line-height: 0.94 !important;
+    text-align: center !important;
+  }
+
+  .hospital-brand-text-cluster--navbar .header-brand-mgmt-half-md {
+    font-size: var(--header-brand-mgmt-desktop) !important;
+    line-height: 1.12 !important;
+    text-align: center !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .hospital-brand-text-cluster--navbar .header-brand-name-half-md.hospital-brand-name-single-line {
+    display: block !important;
+  }
+}

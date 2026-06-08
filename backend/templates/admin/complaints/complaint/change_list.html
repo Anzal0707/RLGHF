@@ -1,0 +1,16 @@
+<!-- admin/complaints/complaint/change_list.html -->
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+  {{ block.super }}
+  <div class="object-tools">
+    <ul class="object-tools">
+      <li>
+        <a class="addlink" href="{% url 'admin:complaints_complaint_add' %}">Add Department Complaint</a>
+      </li>
+      <li>
+        <a class="addlink" href="{% url 'admin:complaints_rating_add' %}">Add Individual Complaint</a>
+      </li>
+    </ul>
+  </div>
+{% endblock %}

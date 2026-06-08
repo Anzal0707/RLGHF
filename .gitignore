@@ -1,0 +1,30 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Django
+db.sqlite3
+staticfiles/
+logs/
+
+# Backend build artifacts (regenerated on deploy)
+backend/static/frontend/
+backend/frontend/.next/
+backend/frontend/out/
+backend/frontend/tsconfig.tsbuildinfo
+
+# IDE / tooling
+.cursor/
+.vscode/
+
+# Misc local
+modal_extracted.txt
+home/

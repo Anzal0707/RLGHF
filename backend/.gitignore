@@ -1,0 +1,36 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Django
+db.sqlite3
+staticfiles/
+static/frontend/
+logs/
+media/
+
+# Next.js build artifacts (regenerated on deploy)
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+
+# One-off dev scripts (do not commit)
+frontend/refactor*.py
+frontend/temp_svgs.txt
+test_routing.py
+
+# IDE / tooling
+.cursor/
+.vscode/
+
+# Misc local
+modal_extracted.txt
+home/

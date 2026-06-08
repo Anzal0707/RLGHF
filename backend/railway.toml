@@ -1,0 +1,10 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "cd frontend && npm ci && NEXT_PUBLIC_API_URL=/api npm run build && cd .. && python scripts/copy_frontend_build.py && DJANGO_SETTINGS_MODULE=core.settings.production DJANGO_BUILD_PHASE=1 SECRET_KEY=build-only-not-for-runtime python manage.py collectstatic --noinput"
+
+[deploy]
+preDeployCommand = "DJANGO_SETTINGS_MODULE=core.settings.production python manage.py migrate --noinput && DJANGO_SETTINGS_MODULE=core.settings.production python manage.py init_admin"
+startCommand = "gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+healthcheckPath = "/api/health/"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
