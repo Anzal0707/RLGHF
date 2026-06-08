@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, status, viewsets, filters
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -5,6 +7,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Complaint, Rating
 from .serializers import ComplaintSerializer, RatingSerializer, ComplaintAdminSerializer, RatingAdminSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class ComplaintCreateView(generics.CreateAPIView):
@@ -78,7 +82,14 @@ class ComplaintCreateView(generics.CreateAPIView):
             # This is a normal complaint submission
             serializer = ComplaintSerializer(data=data)
             if serializer.is_valid():
-                serializer.save()
+                try:
+                    serializer.save()
+                except Exception as exc:
+                    logger.error('Complaint save failed (storage error): %s', exc, exc_info=True)
+                    return Response(
+                        {'detail': 'File upload failed. Please try again or submit without a voice recording.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
                 return Response({
                     'ticket_id': serializer.instance.ticket_id,
                     'type': 'complaint'

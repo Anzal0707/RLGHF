@@ -82,8 +82,11 @@ CLOUDINARY_STORAGE = {
 }
 
 STORAGES = {  # noqa: F405
+    # RawMediaCloudinaryStorage uses resource_type="raw" which Cloudinary accepts
+    # for all file types (audio/webm, images, PDFs). The default MediaCloudinaryStorage
+    # uses resource_type="image" and hard-rejects audio files with a 400 error.
     'default': {
-        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+        'BACKEND': 'cloudinary_storage.storage.RawMediaCloudinaryStorage',
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
