@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* App-controlled dark variant only — never OS prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Design tokens (light default) — professional medical blue palette ─────── */
 :root {
   --background: #f4f8fc;
@@ -59,76 +62,66 @@
   --shadow-color: rgba(15, 23, 42, 0.08);
 }
 
-/* ── Dark mode — purpose-built medical dashboard (not color inversion) ─────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b1220;
-    --bg-base: #0b1220;
-    --bg-layer-a: #0f172a;
-    --bg-layer-b: #111c2e;
-    --bg-layer-c: #152238;
-    --bg-glow-primary: rgba(59, 130, 246, 0.1);
-    --bg-glow-secondary: rgba(56, 189, 248, 0.07);
-    --bg-glow-sky: rgba(37, 99, 235, 0.05);
-    --bg-noise-opacity: 0.032;
-    --bg-ambient-opacity: 0.38;
-    --foreground: #f1f5f9;
-    --surface-base: #111c2e;
-    --surface-card: #111c2e;
-    --surface-raised: #1b2a3a;
-    --surface-overlay: #111c2e;
-    --surface-muted: #162436;
-    --surface-language-bar: #0b2a3a;
-    --border-language-bar: rgba(56, 189, 248, 0.2);
-    --surface-rating: #111c2e;
-    --surface-rating-popup: #1f1517;
-    --surface-rating-rated: #1b2a3a;
-    --border-rating-popup: #475569;
-    --border-rating: #2a3f5c;
-    --border-rating-rated: rgba(56, 189, 248, 0.35);
-    --shadow-rating: 0 22px 48px rgba(2, 8, 23, 0.48), 0 0 0 1px rgba(59, 130, 246, 0.06);
-    --surface-input: rgba(27, 42, 58, 0.72);
-    --surface-form-field: #0b2a3a;
-    --surface-form-field-focus: #0f2433;
-    --surface-form-container: #111c2e;
-    --surface-form-section: #1b2a3a;
-    --border-form-field: #475569;
-    --border-form-field-hover: #64748b;
-    --border-default: #2a3f5c;
-    --border-strong: #3b5575;
-    --border-subtle: #243a54;
-    --text-primary: #f1f5f9;
-    --text-secondary: #b6c4d6;
-    --text-muted: #94a3b8;
-    --text-inverse: #0b1220;
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --primary-light: #60a5fa;
-    --primary-dark: #2563eb;
-    --secondary: #94a3b8;
-    --accent: #7dd3fc;
-    --success: #4ade80;
-    --warning: #fbbf24;
-    --error: #f87171;
-    --info: #60a5fa;
-    --focus-ring: rgba(59, 130, 246, 0.32);
-    --shadow-elevated: 0 20px 48px rgba(2, 8, 23, 0.42);
-    --shadow-overlay: 0 28px 64px rgba(2, 8, 23, 0.55);
-    --shadow-color: rgba(2, 8, 23, 0.5);
-  }
-}
-
+/* Explicit app light mode — full token reset; ignores OS prefers-color-scheme */
 :root[data-theme="light"] {
+  --background: #f4f8fc;
+  --bg-base: #f5f9fd;
+  --bg-layer-a: #f8fbff;
+  --bg-layer-b: #eff6ff;
+  --bg-layer-c: #e8f4fc;
+  --bg-glow-primary: rgba(37, 99, 235, 0.1);
+  --bg-glow-secondary: rgba(56, 189, 248, 0.08);
+  --bg-glow-sky: rgba(14, 165, 233, 0.06);
+  --bg-noise-opacity: 0.028;
+  --bg-ambient-opacity: 0.55;
+  --foreground: #0f172a;
+  --surface-base: #ffffff;
+  --surface-card: #ffffff;
+  --surface-raised: #f8fafc;
+  --surface-overlay: #ffffff;
+  --surface-muted: #f1f5f9;
+  --surface-language-bar: #e0f2fe;
+  --border-language-bar: #bae6fd;
+  --surface-rating: #eef6ff;
   --surface-rating-popup: #ffe4e6;
+  --surface-rating-rated: #e8f4fc;
   --border-rating-popup: #0f172a;
+  --border-rating: #dbeafe;
+  --border-rating-rated: rgba(56, 189, 248, 0.45);
+  --shadow-rating: 0 20px 44px rgba(37, 99, 235, 0.1), 0 4px 14px rgba(15, 23, 42, 0.06);
+  --surface-input: rgba(255, 255, 255, 0.82);
   --surface-form-field: #e0f2fe;
   --surface-form-field-focus: #f0f9ff;
   --surface-form-container: #f0f9ff;
   --surface-form-section: #e0f2fe;
   --border-form-field: #334155;
   --border-form-field-hover: #475569;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-subtle: #dbe4f0;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-inverse: #f8fafc;
+  --primary: #2563eb;
+  --primary-hover: #3b82f6;
+  --primary-light: #60a5fa;
+  --primary-dark: #1e3a8a;
+  --secondary: #64748b;
+  --accent: #38bdf8;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  --focus-ring: rgba(37, 99, 235, 0.22);
+  --shadow-elevated: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --shadow-overlay: 0 24px 56px rgba(15, 23, 42, 0.12);
+  --dept-border-light: #2563eb;
+  --dept-border-dark: #60a5fa;
+  --shadow-color: rgba(15, 23, 42, 0.08);
 }
 
+/* Dark tokens apply ONLY when the app explicitly selects dark (never OS media). */
 :root.dark,
 :root[data-theme="dark"] {
   --background: #0b1220;
@@ -192,6 +185,7 @@ html {
   max-width: 100%;
   min-height: 100dvh;
   overflow-x: hidden;
+  color-scheme: light only;
   background-color: var(--bg-base);
   background-image:
     radial-gradient(ellipse 85% 55% at 8% -5%, var(--bg-glow-primary), transparent 58%),
@@ -200,6 +194,11 @@ html {
     linear-gradient(168deg, var(--bg-layer-a) 0%, var(--bg-layer-b) 46%, var(--bg-layer-c) 100%);
   background-attachment: fixed;
   transition: background-color 0.35s ease, background-image 0.35s ease;
+}
+
+html.dark,
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 html::before {
@@ -973,29 +972,40 @@ html.dark {
   .header-top-row {
     align-items: center;
     min-height: 0;
+    gap: 0.5rem;
   }
 
   .header-branding-group {
     flex: 1 1 0%;
     min-width: 0;
-    gap: 0.625rem;
+    max-width: 100%;
+    gap: 0.5rem;
     align-items: center;
     overflow: hidden;
+    padding-right: 0.25rem;
   }
 
   .header-branding-group .hospital-brand-text-cluster--navbar {
     flex: 1 1 0%;
     min-width: 0;
     max-width: 100%;
-    overflow: visible;
+    overflow: hidden;
     justify-content: center;
-    margin-left: 0.375rem;
+    margin-left: 0.25rem;
+    padding-right: 0.125rem;
   }
 
   .header-branding-group .hospital-brand-block {
     min-width: 0;
     width: 100%;
-    overflow: visible;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .header-branding-group .hospital-brand-management-block {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .hospital-brand-lines-mobile {
@@ -1007,6 +1017,7 @@ html.dark {
   }
 
   .header-top-row .header-logo-box {
+    flex-shrink: 0;
     height: 2.625rem !important;
     min-height: 2.625rem !important;
     max-height: 2.625rem !important;
@@ -1027,20 +1038,41 @@ html.dark {
     box-shadow: none !important;
   }
 
+  .header-tilganga-mobile {
+    flex-shrink: 0;
+    margin-left: 0.125rem;
+  }
+
   .header-tilganga-mobile .header-tilganga-box {
     align-items: center;
-    margin-left: 0.125rem;
+    margin-left: 0;
   }
 
   .header-tilganga-mobile .header-tilganga-box img {
     height: 2rem !important;
     max-height: 2rem !important;
     width: auto !important;
-    max-width: 3.8rem !important;
+    max-width: 3.5rem !important;
   }
 
   .header-controls {
+    flex: 0 0 auto;
+    flex-shrink: 0;
     gap: 0.375rem;
     align-items: center;
+    padding-left: 0.125rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .header-branding-group {
+    gap: 0.375rem;
+    padding-right: 0.125rem;
+  }
+
+  .header-tilganga-mobile .header-tilganga-box img {
+    height: 1.75rem !important;
+    max-height: 1.75rem !important;
+    max-width: 3rem !important;
   }
 }

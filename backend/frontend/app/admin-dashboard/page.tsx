@@ -1153,7 +1153,7 @@ export default function AdminDashboardPage() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   // ── UI ────────────────────────────────────────────────────────────────────
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [activeView, setActiveView] = useState<ViewId>("overview");
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
@@ -1235,8 +1235,11 @@ export default function AdminDashboardPage() {
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem("theme") as "dark" | "light" | null;
-    if (saved) setIsDark(saved === "dark");
-    else if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches) setIsDark(false);
+    if (saved === "dark" || saved === "light") {
+      setIsDark(saved === "dark");
+    } else {
+      setIsDark(false);
+    }
 
     const token = localStorage.getItem("access_token");
     if (token) {
@@ -1249,6 +1252,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light only";
   }, [isDark]);
 
   const syncDashboardRef = useRef<(silent?: boolean) => Promise<void>>(async () => {});

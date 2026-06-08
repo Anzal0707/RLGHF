@@ -50,8 +50,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${notoSansDevanagari.variable} ${robotoCondensed.variable} medical-app-shell min-h-dvh w-full antialiased`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");var dark=t==="dark";if(t!=="light"&&t!=="dark"){dark=false;}document.documentElement.setAttribute("data-theme",dark?"dark":"light");document.documentElement.classList.toggle("dark",dark);document.documentElement.style.colorScheme=dark?"dark":"light only";}catch(e){document.documentElement.setAttribute("data-theme","light");document.documentElement.classList.remove("dark");document.documentElement.style.colorScheme="light only";}})();`,
+          }}
+        />
+      </head>
       <body className="medical-app-body min-h-dvh w-full max-w-full overflow-x-hidden">{children}</body>
     </html>
   );

@@ -2230,7 +2230,7 @@ export default function Home() {
 
 
 
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
 
 
 
@@ -2964,6 +2964,7 @@ export default function Home() {
 
 
 
+
   useEffect(() => {
 
 
@@ -3189,43 +3190,22 @@ export default function Home() {
 
 
 
-  // Initialize theme based on preference or system
-
-
+  // Initialize theme from localStorage only (app-controlled; ignores OS dark mode)
 
   useEffect(() => {
-
-
-
     const savedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
-
-
-
-    if (savedTheme) {
-
-
-
+    if (savedTheme === "dark" || savedTheme === "light") {
       setTheme(savedTheme);
-
-
-
-    } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-
-
-
+    } else {
       setTheme("light");
-
-
-
     }
-
-
-
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    const isDark = theme === "dark";
+    document.documentElement.classList.toggle("dark", isDark);
     document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light only";
   }, [theme]);
 
 

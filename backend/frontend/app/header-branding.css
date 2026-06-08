@@ -68,4 +68,30 @@
   .hospital-brand-text-cluster--navbar .header-brand-name-half-md.hospital-brand-name-single-line {
     display: block !important;
   }
+
+  .hospital-brand-text-cluster--navbar .header-brand-name-half-md {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    line-height: 1.06 !important;
+    letter-spacing: 0.022em !important;
+    font-size: clamp(0.5rem, 2.1vw + 0.2rem, 0.8125rem) !important;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .hospital-brand-text-cluster--navbar .header-brand-mgmt-half-md {
+    line-height: 1.06 !important;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
 }
