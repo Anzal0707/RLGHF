@@ -4601,7 +4601,7 @@ export default function Home() {
 
           {/* Language Selector — soft container separation from primary header */}
           <div className="max-md:mt-1 md:mt-0.5 lg:mt-1.5">
-            <div className="language-bar-shell flex items-center justify-center max-md:gap-2 md:gap-3 px-4 max-md:py-0.5 md:py-0.5 lg:py-1 rounded-xl border overflow-visible">
+            <div className="language-bar-shell flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg border overflow-visible">
 
 
 
@@ -4621,7 +4621,7 @@ export default function Home() {
 
 
 
-                className={`language-bar-btn flex-1 px-3 sm:px-4 max-md:py-1 md:py-1.5 lg:py-2 rounded-xl text-sm sm:text-base font-semibold transition-all cursor-pointer text-center border overflow-visible ${lang === l
+                className={`language-bar-btn flex-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer text-center border overflow-visible ${lang === l
 
 
 
@@ -4657,7 +4657,7 @@ export default function Home() {
 
 
 
-                <span className="flex items-center justify-center max-md:gap-1 md:gap-2 overflow-visible">
+                <span className="flex items-center justify-center gap-1 sm:gap-1.5 overflow-visible">
 
 
 
@@ -4665,7 +4665,7 @@ export default function Home() {
 
 
 
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 36 24">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 36 24">
 
 
 
@@ -4701,7 +4701,7 @@ export default function Home() {
 
 
 
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="-17.582 -4.664 71.571 87.246">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="-17.582 -4.664 71.571 87.246">
 
 
 
@@ -4965,7 +4965,7 @@ export default function Home() {
 
 
 
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 36 24">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 36 24">
 
 
 
