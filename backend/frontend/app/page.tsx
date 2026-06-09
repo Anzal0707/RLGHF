@@ -1527,7 +1527,7 @@ const CustomDepartmentSelect = ({
 
 
 
-        className={`complaint-form-field w-full px-4 py-3.5 rounded-xl border-2 text-base cursor-pointer flex items-center justify-between transition-all duration-200 shadow-sm ${isOpen
+        className={`complaint-form-field w-full px-3.5 sm:px-4 py-3 sm:py-3.5 rounded-xl border-2 text-[15px] sm:text-base cursor-pointer flex items-center justify-between transition-all duration-200 shadow-sm ${isOpen
           ? (isDark
             ? "bg-[var(--surface-form-field-focus)] border-[var(--primary)] ring-2 ring-[color:var(--focus-ring)] text-slate-100"
             : "bg-[var(--surface-form-field-focus)] border-[var(--primary)] ring-2 ring-blue-500/20 text-slate-800")
@@ -1683,7 +1683,7 @@ const CustomDepartmentSelect = ({
 
 
 
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all duration-150 ${value === key
+                className={`flex items-center gap-3 px-3 py-2 sm:py-2.5 rounded-lg border cursor-pointer transition-all duration-150 ${value === key
 
 
 
@@ -4052,7 +4052,7 @@ export default function Home() {
   }`;
 
   const voiceRecordingSection = (
-    <div className={`p-5 rounded-2xl border space-y-0 ${complaintFormSection}`}>
+    <div className={`p-4 sm:p-5 rounded-2xl border space-y-0 ${complaintFormSection}`}>
       <label className={`${formLabel} mb-3`}>{t.voiceLabel}</label>
       <div className="flex flex-wrap items-center gap-3">
         {!audioUrl ? (
@@ -5670,8 +5670,22 @@ export default function Home() {
                     transition={{ duration: 0.3, delay: 0.05, ease: "easeOut" }}
                     className={`relative w-full ${modalPanelMaxHeight} overflow-y-auto overflow-x-hidden rounded-3xl scrollbar-hide transition-colors duration-300 ${ratingPopupContainerClass}`}
                   >
-                    <div className="p-6 sm:p-8 pt-4 sm:pt-6">
-                      <div className="flex justify-end">
+                    <div className="p-4 sm:p-6 md:p-8 pt-3 sm:pt-5">
+                      <div className="flex items-start justify-between gap-3 mb-2 sm:mb-3">
+                        <div className="flex flex-col gap-2 w-full pr-2">
+                          <h2 className={`text-xl sm:text-2xl md:text-3xl font-black leading-tight ${sectionTitleColor}`}>
+                            {t.submitComplaint}
+                          </h2>
+                          <div className="w-full mt-1">
+                            <CustomDepartmentSelect
+                              value={department}
+                              onChange={setDepartment}
+                              options={Object.entries(t.locations) as [string, string][]}
+                              isDark={isDark}
+                              placeholder={`-- ${t.locationSelect} --`}
+                            />
+                          </div>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -5679,73 +5693,20 @@ export default function Home() {
                             clearDepartmentAfterDelay();
                           }}
                           aria-label="Close"
-                          className={`inline-flex items-center gap-2 p-2 rounded-lg border transition-colors cursor-pointer antialiased ${
+                          className={`shrink-0 inline-flex items-center justify-center p-2 sm:p-2.5 rounded-xl border transition-colors cursor-pointer antialiased ${
                             isDark
                               ? "text-slate-100 bg-slate-800 border-slate-600 hover:text-white hover:bg-slate-700"
                               : "text-slate-800 bg-slate-100 border-slate-200 hover:text-slate-950 hover:bg-slate-200"
                           }`}
                         >
-                          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
                       </div>
+
                       <div className="animate-fade-in">
-                        <div className="flex flex-col items-start gap-3 border-b pb-4 border-slate-200/20 mt-0">
-                          <h2 className={`text-xl sm:text-2xl md:text-3xl font-black ${sectionTitleColor}`}>
-                            {t.submitComplaint}
-
-
-
-                            </h2>
-
-
-
-                            <div className="w-full">
-
-
-
-                              <CustomDepartmentSelect
-
-
-
-                                value={department}
-
-
-
-                                onChange={setDepartment}
-
-
-
-                                options={Object.entries(t.locations) as [string, string][]}
-
-
-
-                                isDark={isDark}
-
-
-
-                                placeholder={`-- ${t.locationSelect} --`}
-
-
-
-                              />
-
-
-
-                            </div>
-
-
-
-                          </div>
-
-
-
-
-
-
-
-                          <form onSubmit={handleSubmit} className={`p-5 sm:p-8 rounded-3xl border space-y-6 transition-colors ${complaintFormPanel}`}>
+                        <form onSubmit={handleSubmit} className={`p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border space-y-5 sm:space-y-6 transition-colors ${complaintFormPanel}`}>
 
 
 
@@ -5906,57 +5867,18 @@ export default function Home() {
 
 
                             {/* Text Description Box */}
-
-
-
-                            <div className="space-y-2">
-
-
-
+                            <div className="space-y-1.5 sm:space-y-2">
                               <label htmlFor="description" className={formLabel}>
-
-
-
                                 {t.descriptionLabel} {!audioBlob && <span className="text-red-500 ml-1">*</span>}
-
-
-
                               </label>
-
-
-
                               <textarea
-
-
-
                                 id="description"
-
-
-
-                                rows={4}
-
-
-
+                                rows={3}
                                 value={description}
-
-
-
                                 onChange={(e) => setDescription(e.target.value)}
-
-
-
                                 placeholder={t.descriptionPlaceholder}
-
-
-
-                                className={formInput}
-
-
-
+                                className={`${formInput} min-h-[80px] sm:min-h-[100px] resize-y`}
                               />
-
-
-
                             </div>
 
 
@@ -5976,89 +5898,29 @@ export default function Home() {
 
 
                             {/* Anonymity Selector Widget */}
-
-
-
-                            <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors ${complaintFormSection}`}>
-
-
-
-                              <div className="flex items-center gap-2">
-
-
-
-                                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-
-
-
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-
-
-
-                                </svg>
-
-
-
-                                <div>
-
-
-
-                                  <span className={`block text-base font-semibold ${sectionTitleColor}`}>{t.anonymousLabel}</span>
-
-
-
-                                  <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>{isAnonymous ? t.anonymousYes : t.anonymousNo}</span>
-
-
-
+                            <div className={`p-3 sm:p-4 rounded-xl border flex items-center justify-between transition-colors ${complaintFormSection}`}>
+                              <div className="flex items-center gap-3">
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
+                                  <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
                                 </div>
-
-
-
+                                <div className="flex flex-col">
+                                  <span className={`text-sm sm:text-base font-semibold leading-tight ${sectionTitleColor}`}>{t.anonymousLabel}</span>
+                                  <span className={`text-xs sm:text-sm font-medium mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>{isAnonymous ? t.anonymousYes : t.anonymousNo}</span>
+                                </div>
                               </div>
-
-
-
                               <button
-
-
-
                                 type="button"
-
-
-
                                 onClick={() => setIsAnonymous(!isAnonymous)}
-
-
-
-                                className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${switchBg}`}
-
-
-
+                                className={`shrink-0 w-12 h-7 sm:w-14 sm:h-8 rounded-full transition-colors relative cursor-pointer ${switchBg}`}
+                                aria-label="Toggle anonymous"
                               >
-
-
-
                                 <span
-
-
-
-                                  className={`absolute top-1 left-1 w-6 h-6 rounded-full transition-transform ${isAnonymous ? "translate-x-6 bg-slate-900" : "translate-x-0 bg-white shadow-md"
-
-
-
+                                  className={`absolute top-1 left-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full transition-transform ${isAnonymous ? "translate-x-5 sm:translate-x-6 bg-slate-900" : "translate-x-0 bg-white shadow-md"
                                     }`}
-
-
-
                                 />
-
-
-
                               </button>
-
-
-
                             </div>
 
 
@@ -6068,141 +5930,39 @@ export default function Home() {
 
 
                             {/* Complainant Contact Fields */}
-
-
-
                             {!isAnonymous && (
-
-
-
-                              <div className={`p-5 rounded-2xl border space-y-4 animate-fade-in ${complaintFormSection}`}>
-
-
-
+                              <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 sm:space-y-4 animate-fade-in ${complaintFormSection}`}>
                                 <h3 className={`text-sm sm:text-base font-semibold pb-2 border-b border-[color:var(--border-form-field)] ${isDark ? "text-white" : "text-slate-900"}`}>
-
-
-
                                   {t.contactSection}
-
-
-
                                 </h3>
-
-
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-
-
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                   <div className="space-y-1.5">
-
-
-
                                     <label htmlFor="name" className={formLabel}>{t.nameLabel} <span className="text-rose-500">*</span></label>
-
-
-
                                     <input
-
-
-
                                       id="name"
-
-
-
                                       type="text"
-
-
-
                                       value={complainantName}
-
-
-
                                       onChange={(e) => setComplainantName(e.target.value)}
-
-
-
-                                      className={formInput}
-
-
-
+                                      className={formInputCompact}
                                     />
-
-
-
                                   </div>
-
-
-
                                   <div className="space-y-1.5">
-
-
-
                                     <label htmlFor="phone" className={formLabel}>{t.phoneLabel} <span className="text-rose-500">*</span></label>
-
-
-
                                     <input
-
-
-
                                       id="phone"
-
-
-
                                       type="tel"
-
-
-
                                       maxLength={10}
-
-
-
                                       pattern="\d{10}"
-
-
-
                                       onKeyPress={(e) => !/[0-9]/.test(e.key) && e.preventDefault()}
-
-
-
                                       value={complainantPhone}
-
-
-
                                       onChange={(e) => setComplainantPhone(e.target.value.replace(/\D/g, ''))}
-
-
-
                                       placeholder={t.phonePlaceholder}
-
-
-
-                                      className={formInput}
-
-
-
+                                      className={formInputCompact}
                                     />
-
-
-
                                   </div>
-
-
-
                                 </div>
-
-
-
-                                <p className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>{t.phoneHelp}</p>
-
-
-
+                                <p className={`text-xs sm:text-sm font-medium mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>{t.phoneHelp}</p>
                               </div>
-
-
-
                             )}
 
 
@@ -6212,181 +5972,49 @@ export default function Home() {
 
 
                             {/* Patient EMR ID */}
-
-
-
-                            <div className="space-y-2">
-
-
-
+                            <div className="space-y-1.5 sm:space-y-2">
                               <label htmlFor="patientId" className={formLabel}>
-
-
-
                                 {t.patientIdLabel}
-
-
-
                               </label>
-
-
-
                               <input
-
-
-
                                 id="patientId"
-
-
-
                                 type="text"
-
-
-
                                 value={patientId}
-
-
-
                                 onChange={(e) => setPatientId(e.target.value)}
-
-
-
                                 placeholder={t.patientIdPlaceholder}
-
-
-
-                                className={formInput}
-
-
-
+                                className={formInputCompact}
                               />
-
-
-
                             </div>
 
-
-
-
-
-
-
                             {/* File Attachment Upload */}
-
-
-
-                            <div className="space-y-2">
-
-
-
+                            <div className="space-y-1.5 sm:space-y-2">
                               <label htmlFor="attachment" className={`${formLabel} flex items-center gap-2`}>
-
-
-
                                 <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-
-
-
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-
-
-
                                 </svg>
-
-
-
                                 {t.attachmentLabel}
-
-
-
                               </label>
-
-
-
                               <div className="relative group cursor-pointer">
-
-
-
                                 <input
-
-
-
                                   id="attachment"
-
-
-
                                   type="file"
-
-
-
                                   accept="image/*,video/*,application/pdf"
-
-
-
                                   onChange={(e) => {
-
-
-
                                     if (e.target.files && e.target.files[0]) {
-
-
-
                                       setAttachment(e.target.files[0]);
-
-
-
                                     }
-
-
-
                                   }}
-
-
-
                                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-
-
-
                                 />
-
-
-
-                                <div className={formFileDropzone}>
-
-
-
-                                  <span className="truncate">
-
-
-
+                                <div className={`${formFileDropzone} py-3 sm:py-4`}>
+                                  <span className="truncate pr-4 text-sm sm:text-base">
                                     {attachment ? attachment.name : t.chooseFilePlaceholder}
-
-
-
                                   </span>
-
-
-
-                                  <svg className={`w-5 h-5 transition-colors ${isDark ? "text-blue-400 group-hover:text-blue-300" : "text-blue-600 group-hover:text-blue-700"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-
-
-
+                                  <svg className={`shrink-0 w-5 h-5 transition-colors ${isDark ? "text-blue-400 group-hover:text-blue-300" : "text-blue-600 group-hover:text-blue-700"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-
-
-
                                   </svg>
-
-
-
                                 </div>
-
-
-
                               </div>
-
-
-
                             </div>
 
 
@@ -6556,8 +6184,13 @@ export default function Home() {
                 className={`relative w-full ${modalPanelMaxHeight} overflow-y-auto overflow-x-hidden rounded-3xl scrollbar-hide transition-colors duration-300 ${ratingPopupContainerClass}`}
               >
                 {/* Modal Content */}
-                <div className="p-6 sm:p-8">
-                  <div className="flex justify-end">
+                <div className="p-4 sm:p-6 md:p-8 pt-3 sm:pt-5">
+                  <div className="flex items-start justify-between gap-3 mb-2 sm:mb-3">
+                    <div className="flex flex-col gap-2 w-full pr-2">
+                      <h2 className={`text-xl sm:text-2xl md:text-3xl font-black leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {t.btnIndividualComplaint}
+                      </h2>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -6565,22 +6198,20 @@ export default function Home() {
                         setIsIndividualComplaint(false);
                       }}
                       aria-label="Close"
-                      className={`inline-flex items-center gap-2 p-2 rounded-lg border transition-colors cursor-pointer antialiased ${
+                      className={`shrink-0 inline-flex items-center justify-center p-2 sm:p-2.5 rounded-xl border transition-colors cursor-pointer antialiased ${
                         isDark
                           ? "text-slate-100 bg-slate-800 border-slate-600 hover:text-white hover:bg-slate-700"
                           : "text-slate-800 bg-slate-100 border-slate-200 hover:text-slate-950 hover:bg-slate-200"
                       }`}
                     >
-                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  <h2 className={`text-2xl font-bold mb-6 ${isDark ? "text-white" : "text-slate-900"}`}>
-                    {t.btnIndividualComplaint}
-                  </h2>
 
-                  <form onSubmit={handleSubmit} className={`p-5 sm:p-8 rounded-3xl border space-y-4 transition-colors ${complaintFormPanel}`}>
+                  <div className="animate-fade-in">
+                    <form onSubmit={handleSubmit} className={`p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl border space-y-5 sm:space-y-6 transition-colors ${complaintFormPanel}`}>
                     {voiceRecordingSection}
                     {/* Name */}
                     <div className="space-y-1.5">
@@ -6807,6 +6438,7 @@ export default function Home() {
                       {t.btnSubmit}
                     </button>
                   </form>
+                  </div>
                 </div>
               </motion.div>
             </ModalShell>
